@@ -119,4 +119,21 @@ function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();
 function exportCSV(){let rows=[['Date','Customer/Table','Items','Payment','Total'],...db.orders.map(o=>[o.date,o.customer,o.items,o.payment,o.total])];let csv=rows.map(r=>r.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(',')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='cafe-sales.csv';a.click();URL.revokeObjectURL(a.href)}
 function clearData(){if(confirm('Delete all records saved in this browser? This cannot be undone.')){db={orders:[],expenses:[],stock:[],staff:[]};persist()}}
 applyRole();
-</script></body></html>
+</script>
+
+<!-- Supabase Connection -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+  const SUPABASE_URL = "https://ccyzeqzolduiwiwzvnpn.supabase.co";
+
+  const SUPABASE_KEY = "sb_publishable_A2poYEG4ajtURE4CiOqTtA_NXEmhgbs";
+
+  const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+  console.log("Baithak Supabase client initialized!");
+</script>
+</body></html>
