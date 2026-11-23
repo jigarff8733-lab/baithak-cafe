@@ -134,7 +134,7 @@ applyRole();
     SUPABASE_KEY
   );
 
-  supabaseClient.from('business')
+  supabaseClient.from('businesses')
   .select('id')
   .limit(1)
   .then(({data, error}) => {
