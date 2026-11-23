@@ -135,14 +135,5 @@ applyRole();
   );
 
   async function testOwnerLogin() {   const email = prompt("Enter Owner email:");   const password = prompt("Enter Owner password:");    if (!email || !password) return;    const { data, error } = await supabaseClient.auth.signInWithPassword({     email: email,     password: password   });    if (error) {     alert("Login failed: " + error.message);     return;   }    alert("OWNER LOGIN SUCCESSFUL!");    const result = await supabaseClient     .from('businesses')     .select('id')     .limit(1);    if (result.error) {     alert("Database access: " + result.error.message);   } else {     alert("BAITHAK CLOUD CONNECTED!");   } }  testOwnerLogin();
-  .select('id')
-  .limit(1)
-  .then(({data, error}) => {
-    if (error) {
-      alert('Supabase connected, but database access needs permission setup: ' + error.message);
-    } else {
-      alert('BAITHAK CLOUD CONNECTED SUCCESSFULLY!');
-    }
-  });
 </script>
 </body></html>
