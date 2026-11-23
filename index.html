@@ -134,6 +134,15 @@ applyRole();
     SUPABASE_KEY
   );
 
-  console.log("Baithak Supabase client initialized!");
+  supabaseClient.from('business')
+  .select('id')
+  .limit(1)
+  .then(({data, error}) => {
+    if (error) {
+      alert('Supabase connected, but database access needs permission setup: ' + error.message);
+    } else {
+      alert('BAITHAK CLOUD CONNECTED SUCCESSFULLY!');
+    }
+  });
 </script>
 </body></html>
