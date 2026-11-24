@@ -112,7 +112,7 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
         <tr><th>Image</th><th>Item</th><th>Category</th><th>Price</th><th>Availability</th><th>Actions</th></tr>
       </thead>
       <tbody id="menuItemsTable">
-        <tr><td colspan="5" class="empty">Loading menu...</td></tr>
+        <tr><td colspan="6" class="empty">Loading menu...</td></tr>
       </tbody>
     </table>
   </div>
@@ -335,6 +335,7 @@ async function addMenuItem() {
   }
 }
 
+
 async function editMenuItem(id) {
   const item = menuItems.find(x => String(x.id) === String(id));
   if (!item) return;
@@ -345,6 +346,9 @@ async function editMenuItem(id) {
   const priceText = prompt('Food item price:', item.price);
   if (priceText === null) return;
 
+  const imageUrl = prompt('Food image URL (leave blank to remove image):', item.image_url || '');
+  if (imageUrl === null) return;
+
   const price = Number(priceText);
   if (!name.trim() || !Number.isFinite(price) || price <= 0) {
     return alert('Enter a valid name and price.');
@@ -352,19 +356,22 @@ async function editMenuItem(id) {
 
   try {
     const { error } = await supabaseClient.from('menu_items')
-      .update({ name: name.trim(), price: price })
+      .update({
+        name: name.trim(),
+        price: price,
+        image_url: imageUrl.trim() || null
+      })
       .eq('id', id)
       .eq('business_id', cloudBusinessId);
 
     if (error) throw error;
 
     await loadMenu();
-    menuMessage('Food item updated.');
+    menuMessage('Food item and image updated.');
   } catch (error) {
     menuMessage('Update error: ' + error.message, true);
   }
 }
-
 async function toggleMenuItem(id) {
   const item = menuItems.find(x => String(x.id) === String(id));
   if (!item) return;
