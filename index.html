@@ -215,7 +215,7 @@ function render(){let d=today(),orders=[...(cloudCustomerOrders||[]),...(db.orde
 document.getElementById('todayText').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 [['salesMetric',money(sales)],['ordersMetric',todays.length],['expenseMetric',money(cost)],['netMetric',money(sales-cost)],['stockCount',stock.length],['lowCount',stock.filter(x=>x.qty<=x.min).length],['staffCount',staff.length],['presentCount',staff.filter(x=>x.attendance?.[d]==='Present').length],['allExpense',money(allCost)],['expenseEntries',expenses.length],['reportSales',money(allSales)],['reportExpenses',money(allCost)],['reportNet',money(allSales-allCost)],['reportOrders',orders.length]].forEach(([id,v])=>{let e=document.getElementById(id);if(e)e.textContent=v});
 document.getElementById('recentOrders').innerHTML=orders.slice(0,5).map(o=>`<div class="listrow"><div><b>${esc(o.customer||'Walk-in')}</b><div class="small">${esc(o.items)}</div></div><div style="text-align:right"><b>${money(o.total)}</b><div class="small">${esc(o.time||o.date)}</div></div></div>`).join('')||'<div class="empty">No orders yet. Create your first order.</div>';
-document.getElementById('ordersTable').innerHTML=orders.map(o=>`<tr><td>#${String(o.id).slice(-5)}</td><td>${esc(o.customer||'Walk-in')}</td><td>${esc(o.items)}</td><td>${esc(o.payment)}</td><td>${o.status==='New order'?'<span class="pill warn">To be billed</span>':money(o.total)}</td><td>${esc(o.time||o.date)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No orders recorded</td></tr>';
+document.getElementById('ordersTable').innerHTML=orders.map(o=>`<tr> <td>#${String(o.id).slice(-5)}</td> <td>${esc(o.customer||'Walk-in')}</td> <td>${esc(o.items)}</td> <td>${esc(o.payment)}</td> <td>${o.isCloud ? ` <select onchange="updateCustomerOrderStatus(${o.id},this.value)"> <option value="new" ${o.status==='new'?'selected':''}>New</option> <option value="preparing" ${o.status==='preparing'?'selected':''}>Preparing</option> <option value="ready" ${o.status==='ready'?'selected':''}>Ready</option> <option value="served" ${o.status==='served'?'selected':''}>Served</option> </select> <div>${money(o.total)}</div> ` : (o.status==='New order'?'<span class="pill warn">To be billed</span>':money(o.total))}</td> <td>${esc(o.time||o.date)}</td> </tr>`).join('')||'<tr><td colspan="6" class="empty">No orders recorded</td></tr>';
 document.getElementById('expenseTable').innerHTML=expenses.map(e=>`<tr><td>${esc(e.category)}</td><td>${esc(e.description)}</td><td>${money(e.amount)}</td><td>${esc(e.date)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No expenses recorded</td></tr>';
 document.getElementById('stockTable').innerHTML=stock.map(s=>`<tr><td>${esc(s.name)}</td><td>${s.qty}</td><td>${esc(s.unit)}</td><td>${s.min}</td><td><span class="pill ${s.qty<=s.min?'red':''}">${s.qty<=s.min?'Low stock':'In stock'}</span></td><td><button class="secondary" onclick="adjustStock(${s.id})">Update</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No inventory items yet</td></tr>';
 document.getElementById('staffTable').innerHTML=staff.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.role)}</td><td>${esc(s.phone)}</td><td><span class="pill ${s.attendance?.[d]==='Present'?'':'warn'}">${s.attendance?.[d]||'Not marked'}</span></td><td><button class="secondary" onclick="markAttendance(${s.id})">Toggle attendance</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No staff added yet</td></tr>';
@@ -673,7 +673,7 @@ async function loadCustomerOrders() {
       const dt = new Date(o.created_at);
 
       return {
-        id: o.id,
+        id: o.id, isCloud: true,
         customer: (o.customer_name || 'Customer') +
           ' / ' + (o.cafe_tables?.table_name || 'Table'),
         items: (o.order_items || []).map(x =>
@@ -681,7 +681,7 @@ async function loadCustomerOrders() {
         ).join(', '),
         total: Number(o.total_amount || 0),
         payment: 'Pending',
-        status: 'Recorded',
+        status: o.status || 'new',
         date: [
           dt.getFullYear(),
           String(dt.getMonth() + 1).padStart(2, '0'),
@@ -700,6 +700,25 @@ async function loadCustomerOrders() {
   } catch (error) {
     console.error('Customer orders load error:', error);
     alert('Customer orders load error: ' + error.message);
+  }
+}
+  async function updateCustomerOrderStatus(orderId, newStatus) {
+  try {
+    const { error } = await supabaseClient
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('id', orderId)
+      .eq('business_id', cloudBusinessId);
+
+    if (error) throw error;
+
+    const order = cloudCustomerOrders.find(o => o.id === orderId);
+    if (order) order.status = newStatus;
+
+    render();
+  } catch (error) {
+    alert('Status update failed: ' + error.message);
+    await loadCustomerOrders();
   }
 }
 async function startCloud() {
