@@ -66,7 +66,7 @@ let db=JSON.parse(localStorage.getItem(KEY)||'{"orders":[],"expenses":[],"stock"
 const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
 const today=()=>new Date().toISOString().slice(0,10);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function persist(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function persist(){   localStorage.setItem(KEY,JSON.stringify(db));   render();   if(typeof queueCloudSave === 'function') queueCloudSave(); }
 const rolePages={Owner:['dashboard','orders','expenses','inventory','staff','reports','settings'],Manager:['dashboard','orders','expenses','inventory','staff','reports'],Cashier:['dashboard','orders'],Waiter:['dashboard','orders']};
 let currentRole='Owner';
 function applyRole(){
@@ -123,17 +123,166 @@ applyRole();
 
 <!-- Supabase Connection -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
-  const SUPABASE_URL = "https://ccyzeqzolduiwiwzvnpn.supabase.co";
+ 
+const SUPABASE_URL = "https://ccyzeqzolduiwiwzvnpn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A2poYEG4ajtURE4CiOqTtA_NXEmhgbs";
 
-  const SUPABASE_KEY = "sb_publishable_A2poYEG4ajtURE4CiOqTtA_NXEmhgbs";
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
 
-  const supabaseClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
+let cloudBusinessId = null;
+let cloudUserId = null;
+let cloudReady = false;
+let cloudSaveTimer = null;
+let cloudSaveBusy = false;
+let cloudSaveAgain = false;
 
-  async function testOwnerLogin() {   const email = prompt("Enter Owner email:");   const password = prompt("Enter Owner password:");    if (!email || !password) return;    const { data, error } = await supabaseClient.auth.signInWithPassword({     email: email,     password: password   });    if (error) {     alert("Login failed: " + error.message);     return;   }    alert("OWNER LOGIN SUCCESSFUL!");    const result = await supabaseClient     .from('businesses')     .select('id')     .limit(1);    if (result.error) {     alert("Database access: " + result.error.message);   } else {     alert("BAITHAK CLOUD CONNECTED!");   } }  testOwnerLogin();
+function cloudStatus(message) {
+  const el = document.querySelector('.topright .status');
+  if (el) el.textContent = message;
+}
+
+async function startCloud() {
+  try {
+    cloudStatus('Connecting...');
+
+    let { data: sessionData, error } =
+      await supabaseClient.auth.getSession();
+
+    if (error) throw error;
+
+    let user = sessionData.session?.user;
+
+    if (!user) {
+      const email = prompt('Enter Owner email:');
+      if (!email) return;
+
+      const password = prompt('Enter Owner password:');
+      if (!password) return;
+
+      const login = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (login.error) throw login.error;
+      user = login.data.user;
+    }
+
+    cloudUserId = user.id;
+
+    const businessResult = await supabaseClient
+      .from('businesses')
+      .select('id')
+      .eq('owner_user_id', user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (businessResult.error) throw businessResult.error;
+    if (!businessResult.data) {
+      throw new Error('Owner business record not found.');
+    }
+
+    cloudBusinessId = businessResult.data.id;
+
+    const result = await supabaseClient
+      .from('cafe_app_data')
+      .select('id,data')
+      .eq('business_id', cloudBusinessId)
+      .maybeSingle();
+
+    if (result.error) throw result.error;
+
+    const localHasData =
+      db.orders.length || db.expenses.length ||
+      db.stock.length || db.staff.length;
+
+    if (result.data) {
+      if (localHasData &&
+          !confirm('Cloud data already exists. Replace local data with cloud data? Download a local backup first if needed.')) {
+        cloudStatus('Local mode - sync paused');
+        return;
+      }
+
+      db = result.data.data;
+      localStorage.setItem(KEY, JSON.stringify(db));
+      render();
+    } else {
+      const upload = await supabaseClient
+        .from('cafe_app_data')
+        .insert({
+          business_id: cloudBusinessId,
+          owner_user_id: cloudUserId,
+          data: db
+        });
+
+      if (upload.error) throw upload.error;
+    }
+
+    cloudReady = true;
+    cloudStatus('● Cloud connected');
+
+    console.log('BAITHAK CLOUD SYNC READY');
+
+  } catch (error) {
+    cloudReady = false;
+    cloudStatus('● Cloud error');
+    alert('Cloud connection error: ' + error.message);
+    console.error(error);
+  }
+}
+
+async function saveCloudData() {
+  if (!cloudReady) return;
+
+  if (cloudSaveBusy) {
+    cloudSaveAgain = true;
+    return;
+  }
+
+  cloudSaveBusy = true;
+
+  try {
+    const { error } = await supabaseClient
+      .from('cafe_app_data')
+      .upsert({
+        business_id: cloudBusinessId,
+        owner_user_id: cloudUserId,
+        data: db,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'business_id' });
+
+    if (error) throw error;
+
+    cloudStatus('● Cloud synced');
+
+  } catch (error) {
+    cloudStatus('● Sync failed');
+    console.error('Cloud save error:', error);
+    alert('Cloud save failed: ' + error.message);
+  } finally {
+    cloudSaveBusy = false;
+
+    if (cloudSaveAgain) {
+      cloudSaveAgain = false;
+      saveCloudData();
+    }
+  }
+}
+
+function queueCloudSave() {
+  if (!cloudReady) return;
+
+  clearTimeout(cloudSaveTimer);
+
+  cloudSaveTimer = setTimeout(() => {
+    saveCloudData();
+  }, 700);
+}
+
+startCloud();
 </script>
 </body></html>
