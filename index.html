@@ -22,7 +22,12 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
 <aside>
 <div class="navlabel">WORKSPACE</div>
 <div class="nav active" data-page="dashboard" data-roles="Owner,Manager,Cashier,Waiter"><span class="ico">▦</span>Dashboard</div>
-<div class="nav" data-page="orders" data-roles="Owner,Manager,Cashier,Waiter"><span class="ico">▤</span>Orders & Billing</div>
+<div class="nav" data-page="orders" data-roles="Owner,Manager,Cashier,Waiter">
+  <span class="ico">▤</span>Orders & Billing
+</div>
+<div class="nav" data-page="menu" data-roles="Owner">
+  <span class="ico">☕</span>Menu Management
+</div>
 <div class="nav" data-page="expenses" data-roles="Owner,Manager"><span class="ico">₹</span>Expenses</div>
 <div class="nav" data-page="inventory" data-roles="Owner,Manager"><span class="ico">▥</span>Inventory</div>
 <div class="nav" data-page="staff" data-roles="Owner,Manager"><span class="ico">♙</span>Staff & Attendance</div>
@@ -46,7 +51,69 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
 <div class="section card"><div class="sectionhead"><h2>Recent orders</h2><button class="secondary" onclick="showPage('orders')">View all</button></div><div id="recentOrders"></div></div>
 </section>
 
-<section class="page" id="orders"><div class="welcome"><div><div class="tag">SALES</div><h1>Orders & Billing</h1><div class="muted">Create orders and record payments</div></div><button onclick="openOrder()">＋ New Order</button></div><div class="card tablewrap"><table><thead><tr><th>Order</th><th>Customer / Table</th><th>Items</th><th>Payment</th><th>Total</th><th>Time</th></tr></thead><tbody id="ordersTable"></tbody></table></div></section>
+<section class="page" id="orders"><div class="welcome"><div><div class="tag">SALES</div><h1>Orders & Billing</h1><div class="muted">Create orders and record payments</div></div><button onclick="openOrder()">＋ New Order</button></div><div class="card tablewrap"><table><thead><tr><th>Order</th><th>Customer / Table</th><th>Items</th><th>Payment</th><th>Total</th><th>Time</th></tr></thead><tbody id="ordersTable"></tbody></table></div></section><section class="page" id="menu">
+  <div class="welcome">
+    <div>
+      <div class="tag">CAFE SETUP</div>
+      <h1>Menu Management</h1>
+      <div class="muted">Manage your categories, food items and prices</div>
+    </div>
+    <button class="secondary" onclick="loadMenu()">↻ Refresh</button>
+  </div>
+
+  <div class="card section">
+    <h2>Add Category</h2>
+    <div class="formgrid">
+      <div class="field">
+        <label>Category name</label>
+        <input id="newCategoryName" placeholder="e.g. Coffee">
+      </div>
+      <div class="field" style="justify-content:end">
+        <button onclick="addCategory()">＋ Add Category</button>
+      </div>
+    </div>
+    <div id="categoryList" class="actions"></div>
+  </div>
+
+  <div class="card section">
+    <h2>Add Food Item</h2>
+    <div class="formgrid">
+      <div class="field">
+        <label>Item name</label>
+        <input id="newItemName" placeholder="e.g. Cappuccino">
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="newItemCategory">
+          <option value="">Select category</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Price (₹)</label>
+        <input id="newItemPrice" type="number" min="0" step="0.01" placeholder="150">
+      </div>
+    </div>
+    <div class="actions">
+      <button onclick="addMenuItem()">＋ Add Food Item</button>
+    </div>
+  </div>
+
+  <div class="card section tablewrap">
+    <div class="sectionhead">
+      <h2>Food Items</h2>
+      <span class="pill" id="menuItemCount">0 items</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Item</th><th>Category</th><th>Price</th><th>Availability</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="menuItemsTable">
+        <tr><td colspan="5" class="empty">Loading menu...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="notice" id="menuMessage">Menu changes are saved to your Supabase database.</div>
+</section>
 
 <section class="page" id="expenses"><div class="welcome"><div><div class="tag">CASH FLOW</div><h1>Expenses</h1><div class="muted">Track daily kharcha and payments</div></div><button onclick="openExpense()">＋ Add Expense</button></div><div class="grid"><div class="card"><div class="metriclabel">All-time expenses</div><div class="metric" id="allExpense">₹0</div></div><div class="card"><div class="metriclabel">Expense entries</div><div class="metric" id="expenseEntries">0</div></div></div><div class="section card tablewrap"><table><thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Date</th></tr></thead><tbody id="expenseTable"></tbody></table></div></section>
 
@@ -67,7 +134,7 @@ const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:
 const today=()=>new Date().toISOString().slice(0,10);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function persist(){   localStorage.setItem(KEY,JSON.stringify(db));   render();   if(typeof queueCloudSave === 'function') queueCloudSave(); }
-const rolePages={Owner:['dashboard','orders','expenses','inventory','staff','reports','settings'],Manager:['dashboard','orders','expenses','inventory','staff','reports'],Cashier:['dashboard','orders'],Waiter:['dashboard','orders']};
+const rolePages={Owner:['dashboard','orders','menu','expenses','inventory','staff','reports','settings'],Manager:['dashboard','orders','expenses','inventory','staff','reports'],Cashier:['dashboard','orders'],Waiter:['dashboard','orders']};
 let currentRole='Owner';
 function applyRole(){
  currentRole=document.getElementById('roleSelect').value;
@@ -113,6 +180,230 @@ document.getElementById('stockTable').innerHTML=stock.map(s=>`<tr><td>${esc(s.na
 document.getElementById('staffTable').innerHTML=staff.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.role)}</td><td>${esc(s.phone)}</td><td><span class="pill ${s.attendance?.[d]==='Present'?'':'warn'}">${s.attendance?.[d]||'Not marked'}</span></td><td><button class="secondary" onclick="markAttendance(${s.id})">Toggle attendance</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No staff added yet</td></tr>';
 let days=Array.from({length:7},(_,i)=>{let x=new Date();x.setDate(x.getDate()-6+i);return x.toISOString().slice(0,10)}),vals=days.map(day=>orders.filter(o=>o.date===day).reduce((a,o)=>a+o.total,0)),max=Math.max(1,...vals);
 document.getElementById('salesBars').innerHTML=days.map((day,i)=>`<div class="barrow"><span>${new Date(day+'T12:00:00').toLocaleDateString('en-IN',{weekday:'short'})}</span><div class="track"><div class="fill" style="width:${vals[i]/max*100}%"></div></div><b style="text-align:right;color:#eee">${money(vals[i])}</b></div>`).join('');
+}
+
+let menuCategories = [];
+let menuItems = [];
+
+function menuMessage(message, isError = false) {
+  const el = document.getElementById('menuMessage');
+  if (el) {
+    el.textContent = message;
+    el.style.color = isError ? '#f07870' : '#31c879';
+  }
+}
+
+async function loadMenu() {
+  if (!cloudReady || !cloudBusinessId) {
+    menuMessage('Cloud connection ready hone ka wait karo.', true);
+    return;
+  }
+
+  try {
+    const [catResult, itemResult] = await Promise.all([
+      supabaseClient.from('categories')
+        .select('id,name')
+        .eq('business-id', cloudBusinessId),
+
+      supabaseClient.from('menu_items')
+        .select('id,name,category_id,price,is_available')
+        .eq('business_id', cloudBusinessId)
+    ]);
+
+    if (catResult.error) throw catResult.error;
+    if (itemResult.error) throw itemResult.error;
+
+    menuCategories = catResult.data || [];
+    menuItems = itemResult.data || [];
+
+    renderMenu();
+    menuMessage('Menu successfully loaded from cloud.');
+  } catch (error) {
+    menuMessage('Menu load error: ' + error.message, true);
+  }
+}
+
+function renderMenu() {
+  const categoryList = document.getElementById('categoryList');
+  const categorySelect = document.getElementById('newItemCategory');
+  const table = document.getElementById('menuItemsTable');
+  const count = document.getElementById('menuItemCount');
+
+  if (!categoryList || !categorySelect || !table) return;
+
+  categoryList.innerHTML = menuCategories.map(c =>
+    `<span class="pill">${esc(c.name)}
+      <button class="danger" style="padding:4px 7px;margin-left:5px"
+        onclick="deleteCategory('${c.id}')">×</button>
+    </span>`
+  ).join('') || '<span class="muted">No categories added yet.</span>';
+
+  categorySelect.innerHTML =
+    '<option value="">Select category</option>' +
+    menuCategories.map(c =>
+      `<option value="${esc(c.id)}">${esc(c.name)}</option>`
+    ).join('');
+
+  if (count) count.textContent = menuItems.length + ' items';
+
+  table.innerHTML = menuItems.map(item => {
+    const category = menuCategories.find(c => c.id === item.category_id);
+    return `<tr>
+      <td>${esc(item.name)}</td>
+      <td>${esc(category?.name || 'Unassigned')}</td>
+      <td>${money(item.price)}</td>
+      <td>
+        <span class="pill ${item.is_available ? '' : 'red'}">
+          ${item.is_available ? 'Available' : 'Unavailable'}
+        </span>
+      </td>
+      <td>
+        <button class="secondary" onclick="editMenuItem('${item.id}')">Edit</button>
+        <button class="secondary" onclick="toggleMenuItem('${item.id}')">Toggle</button>
+        <button class="danger" onclick="deleteMenuItem('${item.id}')">Delete</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">No food items added yet.</td></tr>';
+}
+
+async function addCategory() {
+  const name = document.getElementById('newCategoryName').value.trim();
+
+  if (!name) return alert('Enter category name.');
+  if (!cloudReady) return alert('Cloud is not connected.');
+
+  try {
+    const { error } = await supabaseClient.from('categories').insert({
+      name: name,
+      "business-id": cloudBusinessId
+    });
+
+    if (error) throw error;
+
+    document.getElementById('newCategoryName').value = '';
+    await loadMenu();
+    menuMessage('Category added successfully.');
+  } catch (error) {
+    menuMessage('Category error: ' + error.message, true);
+  }
+}
+
+async function addMenuItem() {
+  const name = document.getElementById('newItemName').value.trim();
+  const categoryId = document.getElementById('newItemCategory').value;
+  const price = Number(document.getElementById('newItemPrice').value);
+
+  if (!name || !categoryId || !Number.isFinite(price) || price <= 0) {
+    return alert('Enter item name, category and a valid price.');
+  }
+
+  try {
+    const { error } = await supabaseClient.from('menu_items').insert({
+      name: name,
+      category_id: categoryId,
+      price: price,
+      business_id: cloudBusinessId,
+      branch_id: null,
+      is_available: true
+    });
+
+    if (error) throw error;
+
+    document.getElementById('newItemName').value = '';
+    document.getElementById('newItemPrice').value = '';
+    await loadMenu();
+    menuMessage('Food item added successfully.');
+  } catch (error) {
+    menuMessage('Item error: ' + error.message, true);
+  }
+}
+
+async function editMenuItem(id) {
+  const item = menuItems.find(x => String(x.id) === String(id));
+  if (!item) return;
+
+  const name = prompt('Food item name:', item.name);
+  if (name === null) return;
+
+  const priceText = prompt('Food item price:', item.price);
+  if (priceText === null) return;
+
+  const price = Number(priceText);
+  if (!name.trim() || !Number.isFinite(price) || price <= 0) {
+    return alert('Enter a valid name and price.');
+  }
+
+  try {
+    const { error } = await supabaseClient.from('menu_items')
+      .update({ name: name.trim(), price: price })
+      .eq('id', id)
+      .eq('business_id', cloudBusinessId);
+
+    if (error) throw error;
+
+    await loadMenu();
+    menuMessage('Food item updated.');
+  } catch (error) {
+    menuMessage('Update error: ' + error.message, true);
+  }
+}
+
+async function toggleMenuItem(id) {
+  const item = menuItems.find(x => String(x.id) === String(id));
+  if (!item) return;
+
+  try {
+    const { error } = await supabaseClient.from('menu_items')
+      .update({ is_available: !item.is_available })
+      .eq('id', id)
+      .eq('business_id', cloudBusinessId);
+
+    if (error) throw error;
+
+    await loadMenu();
+  } catch (error) {
+    menuMessage('Availability error: ' + error.message, true);
+  }
+}
+
+async function deleteMenuItem(id) {
+  if (!confirm('Delete this food item?')) return;
+
+  try {
+    const { error } = await supabaseClient.from('menu_items')
+      .delete()
+      .eq('id', id)
+      .eq('business_id', cloudBusinessId);
+
+    if (error) throw error;
+
+    await loadMenu();
+    menuMessage('Food item deleted.');
+  } catch (error) {
+    menuMessage('Delete error: ' + error.message, true);
+  }
+}
+
+async function deleteCategory(id) {
+  if (menuItems.some(x => String(x.category_id) === String(id))) {
+    return alert('First move or delete the food items in this category.');
+  }
+
+  if (!confirm('Delete this category?')) return;
+
+  try {
+    const { error } = await supabaseClient.from('categories')
+      .delete()
+      .eq('id', id)
+      .eq('business-id', cloudBusinessId);
+
+    if (error) throw error;
+
+    await loadMenu();
+    menuMessage('Category deleted.');
+  } catch (error) {
+    menuMessage('Category delete error: ' + error.message, true);
+  }
 }
 function backup(){let b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='baithak-cafe-backup.json';a.click();URL.revokeObjectURL(a.href)}
 function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!x.orders||!x.expenses||!x.stock||!x.staff)throw 0;db=x;persist();alert('Backup restored')}catch{alert('Invalid backup file')}};r.readAsText(f)}
@@ -223,6 +514,7 @@ async function startCloud() {
     }
 
     cloudReady = true;
+    loadMenu();
     cloudStatus('● Cloud connected');
 
     console.log('BAITHAK CLOUD SYNC READY');
