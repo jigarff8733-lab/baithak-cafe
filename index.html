@@ -203,7 +203,7 @@ async function loadMenu() {
     const [catResult, itemResult] = await Promise.all([
       supabaseClient.from('categories')
         .select('id,name')
-        .eq('business-id', cloudBusinessId),
+        .eq('"business_id"', cloudBusinessId),
 
       supabaseClient.from('menu_items')
         .select('id,name,category_id,price,is_available')
@@ -395,7 +395,7 @@ async function deleteCategory(id) {
     const { error } = await supabaseClient.from('categories')
       .delete()
       .eq('id', id)
-      .eq('business-id', cloudBusinessId);
+      .eq('"business_id"', cloudBusinessId);
 
     if (error) throw error;
 
