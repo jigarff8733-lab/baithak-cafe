@@ -719,10 +719,10 @@ async function startCloud() {
       if (upload.error) throw upload.error;
     }
 
-    cloudReady = true;
-    loadMenu();
-    cloudStatus('● Cloud connected');
-
+   cloudReady = true;
+loadMenu();
+loadTables();
+cloudStatus('● Cloud connected');
     console.log('BAITHAK CLOUD SYNC READY');
 
   } catch (error) {
