@@ -208,7 +208,7 @@ if(modalType==='staff'){if(!val('name').trim())return alert('Enter employee name
 closeModal();persist()}
 function markAttendance(id){let s=db.staff.find(x=>x.id===id);s.attendance=s.attendance||{};s.attendance[today()]=s.attendance[today()]==='Present'?'Absent':'Present';persist()}
 function adjustStock(id){let s=db.stock.find(x=>x.id===id);let n=prompt('Enter new quantity for '+s.name,s.qty);if(n!==null&&!isNaN(+n)&&+n>=0){s.qty=+n;persist()}}
-function render(){let d=today(),orders=db.orders||[],expenses=db.expenses||[],stock=db.stock||[],staff=db.staff||[];
+function render(){let d=today(),orders=[...(cloudCustomerOrders||[]),...(db.orders||[])],expenses=db.expenses||[],stock=db.stock||[],staff=db.staff||[];
  document.querySelectorAll('#dashboard .grid .card').forEach((c,i)=>{c.style.display=((currentRole==='Waiter'||currentRole==='Cashier')&&i>1)?'none':'block'});
  document.querySelector('#dashboard .two').style.display=(currentRole==='Waiter'||currentRole==='Cashier')?'none':'grid';
  document.querySelector('#dashboard .section.card').style.display=(currentRole==='Waiter'||currentRole==='Cashier')?'none':'block';let todays=orders.filter(x=>x.date===d),te=expenses.filter(x=>x.date===d),sales=todays.reduce((a,x)=>a+x.total,0),cost=te.reduce((a,x)=>a+x.amount,0),allSales=orders.reduce((a,x)=>a+x.total,0),allCost=expenses.reduce((a,x)=>a+x.amount,0);
@@ -641,7 +641,67 @@ function cloudStatus(message) {
   const el = document.querySelector('.topright .status');
   if (el) el.textContent = message;
 }
+let cloudCustomerOrders = [];
 
+async function loadCustomerOrders() {
+  if (!cloudReady || !cloudBusinessId) return;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('orders')
+      .select(`
+        id,
+        order_number,
+        customer_name,
+        status,
+        total_amount,
+        created_at,
+        cafe_tables(table_name),
+        order_items(
+          quantity,
+          price,
+          subtotal,
+          menu_items(name)
+        )
+      `)
+      .eq('business_id', cloudBusinessId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    cloudCustomerOrders = (data || []).map(o => {
+      const dt = new Date(o.created_at);
+
+      return {
+        id: o.id,
+        customer: (o.customer_name || 'Customer') +
+          ' / ' + (o.cafe_tables?.table_name || 'Table'),
+        items: (o.order_items || []).map(x =>
+          x.quantity + ' ' + (x.menu_items?.name || 'Item')
+        ).join(', '),
+        total: Number(o.total_amount || 0),
+        payment: 'Pending',
+        status: 'Recorded',
+        date: [
+          dt.getFullYear(),
+          String(dt.getMonth() + 1).padStart(2, '0'),
+          String(dt.getDate()).padStart(2, '0')
+        ].join('-'),
+        time: dt.toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        createdAtMs: dt.getTime()
+      };
+    });
+
+    render();
+
+  } catch (error) {
+    console.error('Customer orders load error:', error);
+    alert('Customer orders load error: ' + error.message);
+  }
+}
 async function startCloud() {
   try {
     cloudStatus('Connecting...');
@@ -722,6 +782,7 @@ async function startCloud() {
    cloudReady = true;
 loadMenu();
 loadTables();
+loadCustomerOrders();
 cloudStatus('● Cloud connected');
     console.log('BAITHAK CLOUD SYNC READY');
 
