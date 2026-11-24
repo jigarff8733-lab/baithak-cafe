@@ -1,1 +1,192 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BaitHak Cafe — Menu</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10100f;color:#f5f1e8;font-family:Arial,sans-serif}
+header{padding:24px 18px;text-align:center;background:#1b1b19;border-bottom:1px solid #34342f}
+header h1{margin:0;font-size:27px}
+header p{color:#aaa;margin:8px 0 0}
+main{max-width:850px;margin:auto;padding:18px}
+#status{text-align:center;padding:35px;color:#c8c1b3}
+.category{font-size:20px;margin:28px 0 12px}
+.item{display:flex;gap:14px;align-items:center;background:#1b1b19;border:1px solid #34342f;border-radius:14px;padding:12px;margin-bottom:12px}
+.item img{width:88px;height:88px;object-fit:cover;border-radius:10px;background:#292925}
+.item-info{flex:1;min-width:0}
+.item-info h3{margin:0 0 8px;font-size:16px}
+.price{color:#d8b879;font-weight:bold}
+.add,.qty button,.order-btn{border:0;border-radius:9px;padding:10px 14px;background:#d8b879;color:#17140e;font-weight:bold;cursor:pointer}
+.qty{display:flex;align-items:center;gap:10px}
+.qty button{padding:7px 12px}
+.cart{margin-top:30px;background:#1b1b19;border:1px solid #34342f;border-radius:14px;padding:18px}
+.cart h2{margin-top:0}
+.cart-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #34342f}
+input{width:100%;padding:13px;border-radius:9px;border:1px solid #45453e;background:#10100f;color:white;margin:8px 0 14px}
+.order-btn{width:100%;padding:14px;font-size:16px;margin-top:10px}
+.empty{text-align:center;color:#aaa;padding:20px}
+</style>
+</head>
+<body>
+<header>
+<h1>BaitHak Cafe</h1>
+<p id="tableLabel">Your table menu</p>
+</header>
+<main>
+<div id="status">Loading menu...</div>
+<div id="menu"></div>
+<section class="cart" id="cartSection" hidden>
+<h2>Your Cart</h2>
+<div id="cartItems"></div>
+<h3 id="cartTotal">Total: ₹0</h3>
+<label for="customerName">Your name</label>
+<input id="customerName" placeholder="Enter your name">
+<button class="order-btn" onclick="placeOrder()">Place Order</button>
+</section>
+</main>
+<script>
+const SUPABASE_URL = 'https://ccyzeqzolduiwiwzvnpn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_A2poYEG4ajtURE4CiOqTtA_NXEmhgbs';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const token = new URLSearchParams(location.search).get('t');
+let menuData = null;
+let cart = {};
+
+async function loadMenu(){
+  const status = document.getElementById('status');
+  if(!token){
+    status.textContent='Invalid table link. Please scan your table NFC again.';
+    return;
+  }
+  try{
+    const {data,error}=await supabaseClient.rpc('get_customer_menu',{p_token:token});
+    if(error) throw error;
+    if(!data){
+      status.textContent='Table link is invalid or this table is unavailable.';
+      return;
+    }
+    menuData=data;
+    document.getElementById('tableLabel').textContent='Ordering for '+data.table_name;
+    status.remove();
+    renderMenu();
+  }catch(e){
+    status.textContent='Menu load error: '+e.message;
+  }
+}
+
+function renderMenu(){
+  const menu=document.getElementById('menu');
+  menu.innerHTML='';
+  const categories=menuData.categories||[];
+  const items=menuData.items||[];
+  if(!items.length){
+    menu.innerHTML='<div class="empty">Menu is currently empty.</div>';
+    return;
+  }
+  categories.forEach(cat=>{
+    const matching=items.filter(item=>item.category_id===cat.id);
+    if(!matching.length)return;
+    const heading=document.createElement('h2');
+    heading.className='category';
+    heading.textContent=cat.name;
+    menu.appendChild(heading);
+    matching.forEach(item=>menu.appendChild(createItem(item)));
+  });
+  const uncategorized=items.filter(item=>!categories.some(cat=>cat.id===item.category_id));
+  uncategorized.forEach(item=>menu.appendChild(createItem(item)));
+}
+
+function createItem(item){
+  const card=document.createElement('div');
+  card.className='item';
+  const img=document.createElement('img');
+  img.alt=item.name;
+  img.src=item.image_url||'';
+  img.onerror=()=>{img.style.display='none'};
+  const info=document.createElement('div');
+  info.className='item-info';
+  const name=document.createElement('h3');
+  name.textContent=item.name;
+  const price=document.createElement('div');
+  price.className='price';
+  price.textContent='₹'+Number(item.price).toFixed(2);
+  info.append(name,price);
+  const controls=document.createElement('div');
+  controls.id='controls-'+item.id;
+  card.append(img,info,controls);
+  updateItemControl(item.id,controls);
+  return card;
+}
+
+function updateItemControl(id,container){
+  const quantity=cart[id]?.quantity||0;
+  container.innerHTML='';
+  if(quantity===0){
+    const btn=document.createElement('button');
+    btn.className='add';
+    btn.textContent='ADD +';
+    btn.onclick=()=>changeQty(id,1);
+    container.appendChild(btn);
+  }else{
+    const qty=document.createElement('div');
+    qty.className='qty';
+    const minus=document.createElement('button');
+    minus.textContent='−';
+    minus.onclick=()=>changeQty(id,-1);
+    const count=document.createElement('b');
+    count.textContent=quantity;
+    const plus=document.createElement('button');
+    plus.textContent='+';
+    plus.onclick=()=>changeQty(id,1);
+    qty.append(minus,count,plus);
+    container.appendChild(qty);
+  }
+}
+
+function changeQty(id,change){
+  const item=menuData.items.find(x=>x.id===id);
+  if(!item)return;
+  const next=(cart[id]?.quantity||0)+change;
+  if(next<=0)delete cart[id];
+  else cart[id]={item,quantity:next};
+  const control=document.getElementById('controls-'+id);
+  if(control)updateItemControl(id,control);
+  renderCart();
+}
+
+function renderCart(){
+  const section=document.getElementById('cartSection');
+  const entries=Object.values(cart);
+  section.hidden=entries.length===0;
+  const list=document.getElementById('cartItems');
+  list.innerHTML='';
+  let total=0;
+  entries.forEach(entry=>{
+    const subtotal=Number(entry.item.price)*entry.quantity;
+    total+=subtotal;
+    const row=document.createElement('div');
+    row.className='cart-row';
+    const name=document.createElement('span');
+    name.textContent=entry.item.name+' × '+entry.quantity;
+    const amount=document.createElement('b');
+    amount.textContent='₹'+subtotal.toFixed(2);
+    row.append(name,amount);
+    list.appendChild(row);
+  });
+  document.getElementById('cartTotal').textContent='Total: ₹'+total.toFixed(2);
+}
+
+async function placeOrder(){
+  alert('Customer menu is connected. Online order submission will be enabled after we set up secure order placement.');
+}
+
+loadMenu();
+</script>
+</body>
+</html>
+
