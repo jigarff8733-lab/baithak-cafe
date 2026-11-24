@@ -92,6 +92,10 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
         <label>Price (₹)</label>
         <input id="newItemPrice" type="number" min="0" step="0.01" placeholder="150">
       </div>
+      <div class="field">
+        <label>Food Image URL</label>
+        <input id="newItemImage" type="url" placeholder="Paste food image URL">
+      </div>
     </div>
     <div class="actions">
       <button onclick="addMenuItem()">＋ Add Food Item</button>
@@ -105,7 +109,7 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
     </div>
     <table>
       <thead>
-        <tr><th>Item</th><th>Category</th><th>Price</th><th>Availability</th><th>Actions</th></tr>
+        <tr><th>Image</th><th>Item</th><th>Category</th><th>Price</th><th>Availability</th><th>Actions</th></tr>
       </thead>
       <tbody id="menuItemsTable">
         <tr><td colspan="5" class="empty">Loading menu...</td></tr>
@@ -206,7 +210,7 @@ async function loadMenu() {
         .eq('"business_id"', cloudBusinessId),
 
       supabaseClient.from('menu_items')
-        .select('id,name,category_id,price,is_available')
+        .select('id,name,category_id,price,is_available,image_url')
         .eq('business_id', cloudBusinessId)
     ]);
 
@@ -222,6 +226,7 @@ async function loadMenu() {
     menuMessage('Menu load error: ' + error.message, true);
   }
 }
+
 
 function renderMenu() {
   const categoryList = document.getElementById('categoryList');
@@ -248,7 +253,15 @@ function renderMenu() {
 
   table.innerHTML = menuItems.map(item => {
     const category = menuCategories.find(c => c.id === item.category_id);
+
+    const imagePreview = item.image_url
+      ? `<img src="${esc(item.image_url)}" alt="${esc(item.name)}"
+          style="width:55px;height:55px;object-fit:cover;border-radius:8px;"
+          onerror="this.style.display='none'">`
+      : '<span class="muted">No image</span>';
+
     return `<tr>
+      <td>${imagePreview}</td>
       <td>${esc(item.name)}</td>
       <td>${esc(category?.name || 'Unassigned')}</td>
       <td>${money(item.price)}</td>
@@ -263,7 +276,7 @@ function renderMenu() {
         <button class="danger" onclick="deleteMenuItem('${item.id}')">Delete</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="5" class="empty">No food items added yet.</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">No food items added yet.</td></tr>';
 }
 
 async function addCategory() {
@@ -292,6 +305,7 @@ async function addMenuItem() {
   const name = document.getElementById('newItemName').value.trim();
   const categoryId = document.getElementById('newItemCategory').value;
   const price = Number(document.getElementById('newItemPrice').value);
+  const imageUrl = document.getElementById('newItemImage').value.trim();
 
   if (!name || !categoryId || !Number.isFinite(price) || price <= 0) {
     return alert('Enter item name, category and a valid price.');
@@ -302,6 +316,7 @@ async function addMenuItem() {
       name: name,
       category_id: categoryId,
       price: price,
+      image_url: imageUrl || null,
       business_id: cloudBusinessId,
       branch_id: null,
       is_available: true
@@ -311,6 +326,8 @@ async function addMenuItem() {
 
     document.getElementById('newItemName').value = '';
     document.getElementById('newItemPrice').value = '';
+    document.getElementById('newItemImage').value = '';
+
     await loadMenu();
     menuMessage('Food item added successfully.');
   } catch (error) {
