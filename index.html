@@ -123,16 +123,18 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
   <div class="notice" id="menuMessage">Menu changes are saved to your Supabase database.</div>
 </section>
 <section class="page" id="tables">
-  <div class="page-head">
+  <div class="welcome">
     <div>
-      <h2>Tables Management</h2>
-      <p class="muted">Add tables and generate customer NFC links</p>
+      <div class="tag">CAFE SETUP</div>
+      <h1>Tables Management</h1>
+      <div class="muted">Add tables and generate customer NFC links</div>
     </div>
+    <button class="secondary" onclick="loadTables()">↻ Refresh</button>
   </div>
 
-  <div class="panel">
-    <h3>Add New Table</h3>
-    <div class="form-row">
+  <div class="card section">
+    <h2>Add New Table</h2>
+    <div class="formgrid">
       <div class="field">
         <label>Table Name</label>
         <input id="newTableName" placeholder="e.g. Table 1">
@@ -142,12 +144,16 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
         <input id="newTableCapacity" type="number" min="1" placeholder="e.g. 4">
       </div>
     </div>
-    <button class="btn btn-primary" onclick="addCafeTable()">Add Table</button>
+    <button onclick="addCafeTable()">＋ Add Table</button>
   </div>
 
-  <div class="panel">
-    <h3>All Tables</h3>
-    <div id="cafeTablesList"></div>
+  <div class="card section">
+    <div class="sectionhead">
+      <h2>All Tables</h2>
+    </div>
+    <div id="cafeTablesList">
+      <div class="empty">Loading tables...</div>
+    </div>
   </div>
 </section>
 <section class="page" id="expenses"><div class="welcome"><div><div class="tag">CASH FLOW</div><h1>Expenses</h1><div class="muted">Track daily kharcha and payments</div></div><button onclick="openExpense()">＋ Add Expense</button></div><div class="grid"><div class="card"><div class="metriclabel">All-time expenses</div><div class="metric" id="allExpense">₹0</div></div><div class="card"><div class="metriclabel">Expense entries</div><div class="metric" id="expenseEntries">0</div></div></div><div class="section card tablewrap"><table><thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Date</th></tr></thead><tbody id="expenseTable"></tbody></table></div></section>
@@ -219,6 +225,151 @@ document.getElementById('salesBars').innerHTML=days.map((day,i)=>`<div class="ba
 
 let menuCategories = [];
 let menuItems = [];
+  let cafeTables = [];
+
+async function loadTables() {
+  const list = document.getElementById('cafeTablesList');
+
+  if (!cloudReady || !cloudBusinessId) {
+    list.innerHTML = '<div class="empty">Cloud connection is not ready.</div>';
+    return;
+  }
+
+  list.innerHTML = '<div class="empty">Loading tables...</div>';
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('cafe_tables')
+      .select('id,table_name,capacity,status,public_token')
+      .eq('business_id', cloudBusinessId)
+      .order('id');
+
+    if (error) throw error;
+
+    cafeTables = data || [];
+    renderCafeTables();
+
+  } catch (error) {
+    list.innerHTML = '<div class="empty">Table load error: ' +
+      esc(error.message) + '</div>';
+  }
+}
+
+function renderCafeTables() {
+  const list = document.getElementById('cafeTablesList');
+
+  if (!cafeTables.length) {
+    list.innerHTML = '<div class="empty">No tables added yet.</div>';
+    return;
+  }
+
+  list.innerHTML = `
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Table</th>
+            <th>Capacity</th>
+            <th>Status</th>
+            <th>NFC Link</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cafeTables.map(t => `
+            <tr>
+              <td><b>${esc(t.table_name)}</b></td>
+              <td>${t.capacity || '-'}</td>
+              <td>${esc(t.status || 'available')}</td>
+              <td>
+                <button class="secondary"
+                  onclick="copyNfcLink('${esc(t.public_token || '')}')">
+                  Copy Link
+                </button>
+              </td>
+              <td>
+                <button class="danger"
+                  onclick="deleteCafeTable(${t.id})">
+                  Delete
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function addCafeTable() {
+  const name = document.getElementById('newTableName').value.trim();
+  const capacity = Number(document.getElementById('newTableCapacity').value);
+
+  if (!name) return alert('Enter table name.');
+  if (!Number.isInteger(capacity) || capacity < 1) {
+    return alert('Enter a valid seating capacity.');
+  }
+  if (!cloudReady || !cloudBusinessId) {
+    return alert('Cloud is not connected.');
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from('cafe_tables')
+      .insert({
+        table_name: name,
+        capacity: capacity,
+        status: 'available',
+        business_id: cloudBusinessId,
+        branch_id: null
+      });
+
+    if (error) throw error;
+
+    document.getElementById('newTableName').value = '';
+    document.getElementById('newTableCapacity').value = '';
+
+    await loadTables();
+    alert('Table added successfully.');
+
+  } catch (error) {
+    alert('Add table error: ' + error.message);
+  }
+}
+
+async function deleteCafeTable(id) {
+  if (!confirm('Are you sure you want to delete this table?')) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from('cafe_tables')
+      .delete()
+      .eq('id', id)
+      .eq('business_id', cloudBusinessId);
+
+    if (error) throw error;
+
+    await loadTables();
+    alert('Table deleted successfully.');
+
+  } catch (error) {
+    alert('Delete table error: ' + error.message);
+  }
+}
+
+async function copyNfcLink(token) {
+  if (!token) return alert('NFC token is missing.');
+
+  const url = new URL('customer.html', window.location.href);
+  url.searchParams.set('t', token);
+
+  try {
+    await navigator.clipboard.writeText(url.href);
+    alert('Customer link copied!');
+  } catch (error) {
+    prompt('Copy this customer link:', url.href);
+  }
+}
 
 function menuMessage(message, isError = false) {
   const el = document.getElementById('menuMessage');
@@ -238,7 +389,7 @@ async function loadMenu() {
     const [catResult, itemResult] = await Promise.all([
       supabaseClient.from('categories')
         .select('id,name')
-        .eq('"business_id"', cloudBusinessId),
+        .eq('business_id', cloudBusinessId),
 
       supabaseClient.from('menu_items')
         .select('id,name,category_id,price,is_available,image_url')
