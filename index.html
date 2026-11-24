@@ -28,6 +28,10 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
 <div class="nav" data-page="menu" data-roles="Owner">
   <span class="ico">☕</span>Menu Management
 </div>
+
+<div class="nav" data-page="tables" data-roles="Owner">
+  <span class="ico">▦</span>Tables Management
+</div>
 <div class="nav" data-page="expenses" data-roles="Owner,Manager"><span class="ico">₹</span>Expenses</div>
 <div class="nav" data-page="inventory" data-roles="Owner,Manager"><span class="ico">▥</span>Inventory</div>
 <div class="nav" data-page="staff" data-roles="Owner,Manager"><span class="ico">♙</span>Staff & Attendance</div>
@@ -118,7 +122,34 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
   </div>
   <div class="notice" id="menuMessage">Menu changes are saved to your Supabase database.</div>
 </section>
+<section class="page" id="tables">
+  <div class="page-head">
+    <div>
+      <h2>Tables Management</h2>
+      <p class="muted">Add tables and generate customer NFC links</p>
+    </div>
+  </div>
 
+  <div class="panel">
+    <h3>Add New Table</h3>
+    <div class="form-row">
+      <div class="field">
+        <label>Table Name</label>
+        <input id="newTableName" placeholder="e.g. Table 1">
+      </div>
+      <div class="field">
+        <label>Seating Capacity</label>
+        <input id="newTableCapacity" type="number" min="1" placeholder="e.g. 4">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="addCafeTable()">Add Table</button>
+  </div>
+
+  <div class="panel">
+    <h3>All Tables</h3>
+    <div id="cafeTablesList"></div>
+  </div>
+</section>
 <section class="page" id="expenses"><div class="welcome"><div><div class="tag">CASH FLOW</div><h1>Expenses</h1><div class="muted">Track daily kharcha and payments</div></div><button onclick="openExpense()">＋ Add Expense</button></div><div class="grid"><div class="card"><div class="metriclabel">All-time expenses</div><div class="metric" id="allExpense">₹0</div></div><div class="card"><div class="metriclabel">Expense entries</div><div class="metric" id="expenseEntries">0</div></div></div><div class="section card tablewrap"><table><thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Date</th></tr></thead><tbody id="expenseTable"></tbody></table></div></section>
 
 <section class="page" id="inventory"><div class="welcome"><div><div class="tag">STOCK CONTROL</div><h1>Inventory</h1><div class="muted">Manage ingredients and supplies</div></div><button onclick="openStock()">＋ Add Item</button></div><div class="card tablewrap"><table><thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Minimum level</th><th>Status</th><th></th></tr></thead><tbody id="stockTable"></tbody></table></div></section>
@@ -138,7 +169,7 @@ const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:
 const today=()=>new Date().toISOString().slice(0,10);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function persist(){   localStorage.setItem(KEY,JSON.stringify(db));   render();   if(typeof queueCloudSave === 'function') queueCloudSave(); }
-const rolePages={Owner:['dashboard','orders','menu','expenses','inventory','staff','reports','settings'],Manager:['dashboard','orders','expenses','inventory','staff','reports'],Cashier:['dashboard','orders'],Waiter:['dashboard','orders']};
+const rolePages={Owner:['dashboard','orders','menu','tables','expenses','inventory','staff','reports','settings'],Manager:['dashboard','orders','expenses','inventory','staff','reports'],Cashier:['dashboard','orders'],Waiter:['dashboard','orders']};
 let currentRole='Owner';
 function applyRole(){
  currentRole=document.getElementById('roleSelect').value;
