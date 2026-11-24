@@ -275,7 +275,7 @@ async function addCategory() {
   try {
     const { error } = await supabaseClient.from('categories').insert({
       name: name,
-      "business-id": cloudBusinessId
+      "business_id": cloudBusinessId
     });
 
     if (error) throw error;
