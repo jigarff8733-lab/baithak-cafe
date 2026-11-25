@@ -707,6 +707,83 @@ function setupOrderSoundButton() {
 
   document.body.appendChild(btn);
 }
+  function showNewOrderPopup(order) {
+  const oldPopup = document.getElementById('newOrderPopup');
+  if (oldPopup) oldPopup.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'newOrderPopup';
+
+  overlay.style.cssText = `
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.8);
+    z-index:100000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  `;
+
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background:#1b1b19;
+    color:#f5f1e8;
+    border:2px solid #d8b879;
+    border-radius:18px;
+    padding:25px;
+    width:100%;
+    max-width:420px;
+    font-family:Arial,sans-serif;
+  `;
+
+  const title = document.createElement('h2');
+  title.textContent = '🔔 NEW ORDER!';
+  title.style.color = '#d8b879';
+
+  const customer = document.createElement('h3');
+  customer.textContent = 'Customer: ' + (order.customer_name || 'Customer');
+
+  const table = document.createElement('p');
+  table.textContent = 'Table: ' + (order.cafe_tables?.table_name || 'Table');
+
+  const itemsHeading = document.createElement('h3');
+  itemsHeading.textContent = 'Order Items';
+
+  const items = document.createElement('div');
+  (order.order_items || []).forEach(item => {
+    const line = document.createElement('p');
+    line.textContent =
+      (item.menu_items?.name || 'Item') +
+      ' × ' + item.quantity +
+      ' — ₹' + Number(item.subtotal || 0).toFixed(2);
+    items.appendChild(line);
+  });
+
+  const total = document.createElement('h2');
+  total.textContent = 'Total: ₹' + Number(order.total_amount || 0).toFixed(2);
+  total.style.color = '#d8b879';
+
+  const close = document.createElement('button');
+  close.textContent = 'Close';
+  close.style.cssText = `
+    width:100%;
+    padding:14px;
+    border:0;
+    border-radius:9px;
+    background:#d8b879;
+    color:#17140e;
+    font-weight:bold;
+    font-size:16px;
+    cursor:pointer;
+    margin-top:15px;
+  `;
+  close.onclick = () => overlay.remove();
+
+  box.append(title, customer, table, itemsHeading, items, total, close);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
 async function loadCustomerOrders() {
   if (!cloudReady || !cloudBusinessId) return;
 
@@ -739,16 +816,16 @@ async function loadCustomerOrders() {
       newOrders.map(o => String(o.id))
     );
 
-    if (knownCustomerOrderIds !== null) {
-      const hasNewOrder = newOrders.some(
-        o => !knownCustomerOrderIds.has(String(o.id))
-      );
+  if (knownCustomerOrderIds !== null) {
+  const newlyReceivedOrders = newOrders.filter(
+    o => !knownCustomerOrderIds.has(String(o.id))
+  );
 
-      if (hasNewOrder) {
-        playNewOrderSound();
-      }
-    }
-
+  newlyReceivedOrders.forEach(order => {
+    playNewOrderSound();
+    showNewOrderPopup(order);
+  });
+}
     knownCustomerOrderIds = currentIds;
 
     cloudCustomerOrders = newOrders.map(o => {
