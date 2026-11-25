@@ -990,11 +990,13 @@ async function finishTableBill(sessionId, method) {
   loadTables();
 }
 
+
 async function printTableBill(sessionId) {
   const { data: session, error } = await supabaseClient
     .from('table_bill_sessions')
     .select(`
       id, customer_name, total_amount, created_at,
+      status, payment_method,
       cafe_tables(table_name),
       orders(
         order_number, total_amount,
@@ -1009,19 +1011,38 @@ async function printTableBill(sessionId) {
     return;
   }
 
+  const safe = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[ch]);
+
   const items = (session.orders || []).flatMap(order =>
     (order.order_items || []).map(item => {
       const menu = Array.isArray(item.menu_items)
         ? item.menu_items[0] : item.menu_items;
-      return `<tr>
-        <td>${String(menu?.name || 'Item').replace(/[&<>"']/g, '')}</td>
-        <td>${Number(item.quantity || 0)}</td>
-        <td>₹${Number(item.subtotal || 0).toFixed(2)}</td>
-      </tr>`;
+
+      const qty = Number(item.quantity || 0);
+      const amount = Number(item.subtotal || 0);
+      const rate = qty > 0 ? amount / qty : 0;
+
+      return `
+        <tr>
+          <td>${safe(menu?.name || 'Item')}</td>
+          <td>${qty}</td>
+          <td>₹${rate.toFixed(2)}</td>
+          <td>₹${amount.toFixed(2)}</td>
+        </tr>
+      `;
     })
   ).join('');
 
+  const paid = session.status === 'paid';
+
   const w = window.open('', '_blank');
+
   if (!w) {
     alert('Please allow popups to print the receipt.');
     return;
@@ -1029,27 +1050,140 @@ async function printTableBill(sessionId) {
 
   w.document.write(`
     <!DOCTYPE html>
-    <html><head><title>Cafe Receipt</title>
-    <style>
-      body{font-family:Arial;padding:25px;max-width:500px;margin:auto}
-      h2{text-align:center}
-      table{width:100%;border-collapse:collapse;margin-top:20px}
-      th,td{padding:9px;border-bottom:1px solid #ddd;text-align:left}
-      .total{text-align:right;font-size:20px;margin-top:20px}
-    </style></head><body>
-      <h2>BaitHak Cafe</h2>
-      <p>Table: ${String(session.cafe_tables?.table_name || 'Table')}</p>
-      <p>Customer: ${String(session.customer_name || 'Customer')}</p>
-      <p>Date: ${new Date(session.created_at).toLocaleString('en-IN')}</p>
-      <table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead>
-      <tbody>${items}</tbody></table>
-      <div class="total"><strong>Total: ₹${Number(session.total_amount || 0).toFixed(2)}</strong></div>
-      <p style="text-align:center;margin-top:35px">Thank you for visiting!</p>
-      <script>window.onload=()=>window.print();<\/script>
-    </body></html>
+    <html>
+    <head>
+      <title>BaitHak Cafe Receipt</title>
+      <style>
+        * { box-sizing:border-box; }
+        body {
+          font-family:Arial,sans-serif;
+          max-width:520px;
+          margin:25px auto;
+          padding:20px;
+          color:#222;
+        }
+        .center { text-align:center; }
+        .brand {
+          font-size:28px;
+          font-weight:bold;
+          letter-spacing:2px;
+          margin-bottom:5px;
+        }
+        .muted { color:#666;font-size:12px; }
+        hr { border:0;border-top:1px dashed #aaa;margin:16px 0; }
+        .details {
+          display:flex;
+          justify-content:space-between;
+          gap:10px;
+          margin:7px 0;
+          font-size:13px;
+        }
+        table {
+          width:100%;
+          border-collapse:collapse;
+          margin-top:18px;
+          font-size:12px;
+        }
+        th,td {
+          padding:9px 4px;
+          border-bottom:1px solid #ddd;
+          text-align:left;
+        }
+        th:last-child,td:last-child { text-align:right; }
+        .total {
+          display:flex;
+          justify-content:space-between;
+          font-size:21px;
+          font-weight:bold;
+          margin-top:18px;
+        }
+        .status {
+          text-align:center;
+          padding:9px;
+          margin-top:15px;
+          border:1px solid #aaa;
+          font-weight:bold;
+        }
+        .footer {
+          text-align:center;
+          margin-top:35px;
+          font-size:12px;
+          line-height:1.7;
+        }
+        @media print {
+          body { margin:0 auto;padding:10px; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="center">
+        <div class="brand">BAITHAK CAFE</div>
+        <div class="muted">Main Road, Gujarat, India</div>
+        <div class="muted">Mobile: +91 99999 99999 (Sample)</div>
+        <h3>INVOICE / RECEIPT</h3>
+      </div>
+
+      <hr>
+
+      <div class="details">
+        <span>Bill Number</span>
+        <strong>BH-${session.id}</strong>
+      </div>
+      <div class="details">
+        <span>Date & Time</span>
+        <strong>${safe(new Date(session.created_at).toLocaleString('en-IN'))}</strong>
+      </div>
+      <div class="details">
+        <span>Table</span>
+        <strong>${safe(session.cafe_tables?.table_name || 'Table')}</strong>
+      </div>
+      <div class="details">
+        <span>Customer</span>
+        <strong>${safe(session.customer_name)}</strong>
+      </div>
+
+      <hr>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>${items}</tbody>
+      </table>
+
+      <div class="total">
+        <span>Grand Total</span>
+        <span>₹${Number(session.total_amount || 0).toFixed(2)}</span>
+      </div>
+
+      <div class="status">
+        PAYMENT: ${paid ? 'PAID' : 'UNPAID'}
+        ${paid && session.payment_method
+          ? ' - ' + safe(session.payment_method.toUpperCase())
+          : ''}
+      </div>
+
+      <div class="footer">
+        <strong>Thank You for Visiting!</strong><br>
+        We hope to see you again.<br><br>
+        <span class="muted">Powered by BaitHak Cafe</span>
+      </div>
+
+      <script>
+        window.onload = () => window.print();
+      <\/script>
+    </body>
+    </html>
   `);
+
   w.document.close();
 }
+
   async function loadRunningBills() {
   const box = document.getElementById('runningBillsList');
   if (!box || !cloudBusinessId || !supabaseClient) return;
