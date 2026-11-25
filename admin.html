@@ -213,7 +213,7 @@ async function verifyAdmin(){
         method: "POST"
       });
 
-    if (error) throw error;
+    if (error) {   console.error("VERIFY FUNCTION ERROR:", error);    let details = "";    try {     const response = error.context;     if (response && typeof response.json === "function") {       const result = await response.json();       details = result.message || JSON.stringify(result);     }   } catch (e) {     details = error.message;   }    throw new Error(details || error.message); }
 
     if (!data || data.success !== true) {
       throw new Error(data?.message || "Super Admin access denied.");
