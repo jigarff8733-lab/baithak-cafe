@@ -445,6 +445,28 @@ async function loadCafes() {
         <p>Email: ${email}</p>
         <p>License: <strong>${status.toUpperCase()}</strong></p>
         <p>One-time Fee: ${fee}</p>
+        
+<div style="margin-top:16px;border-top:1px solid #34342f;padding-top:12px">
+  <strong>License Change History</strong>
+  ${
+    cafe.license_events?.length
+      ? cafe.license_events.map(event => `
+        <div style="margin-top:10px;padding:10px;background:#171715;border-radius:8px">
+          <strong>
+            ${escapeHTML(event.old_status || "New")}
+            → ${escapeHTML(event.new_status)}
+          </strong>
+          <div class="muted">
+            ${escapeHTML(new Date(event.created_at).toLocaleString())}
+          </div>
+          <div>Reason: ${escapeHTML(event.reason || "Not specified")}</div>
+          <div class="muted">Admin ID: ${escapeHTML(event.changed_by)}</div>
+        </div>
+      `).join("")
+      : '<p class="muted">No license changes recorded yet.</p>'
+  }
+</div>
+
         <div class="actions">
           <button class="secondary" data-action="suspend">Suspend</button>
           <button data-action="active">Reactivate</button>
