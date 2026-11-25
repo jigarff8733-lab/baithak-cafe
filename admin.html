@@ -157,6 +157,21 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
     <div id="createMessage" class="message"></div>
   </div>
+  
+  <div class="card">
+    <h2>Cafe License Management</h2>
+    <p class="muted">View cafes and manage their software licenses.</p>
+
+    <div class="actions">
+      <button class="secondary" onclick="loadCafes()">
+        Refresh Cafe List
+      </button>
+    </div>
+
+    <div id="cafeListMessage" class="message"></div>
+    <div id="cafeList"></div>
+  </div>
+
 </section>
 
 </main>
@@ -226,7 +241,7 @@ async function verifyAdmin(){
     logoutBtn.classList.remove("hidden");
 
     message("loginMessage", "Super Admin verified successfully.", "success");
-
+    await loadCafes();
     return true;
 
   } catch (error) {
@@ -370,6 +385,167 @@ async function createCafe(){
   }finally{
     btn.disabled=false;
     btn.textContent="Create Cafe Account";
+  }
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+async function loadCafes() {
+  if (!authorized) return;
+
+  const list = document.getElementById("cafeList");
+  list.textContent = "Loading cafes...";
+  message("cafeListMessage", "");
+
+  try {
+    const { data, error } =
+      await supabaseClient.functions.invoke("list-cafes", {
+        method: "POST"
+      });
+
+    if (error) throw error;
+    if (!data?.success) {
+      throw new Error(data?.message || "Could not load cafes.");
+    }
+
+    list.innerHTML = "";
+
+    if (!data.cafes?.length) {
+      list.textContent = "No cafes found.";
+      return;
+    }
+
+    data.cafes.forEach(cafe => {
+      const card = document.createElement("div");
+      card.className = "notice";
+      card.style.background = "#20201d";
+      card.style.borderColor = "#34342f";
+
+      const name = escapeHTML(
+        cafe.name || cafe.cafe_name || "Unnamed Cafe"
+      );
+      const owner = escapeHTML(cafe.owner_name || "Not available");
+      const email = escapeHTML(cafe.owner_email || "Not available");
+      const status = escapeHTML(cafe.license_status || "unknown");
+      const fee = cafe.one_time_fee == null
+        ? "Not recorded"
+        : "₹" + escapeHTML(cafe.one_time_fee);
+
+      card.innerHTML = `
+        <h3>${name}</h3>
+        <p>Owner: ${owner}</p>
+        <p>Email: ${email}</p>
+        <p>License: <strong>${status.toUpperCase()}</strong></p>
+        <p>One-time Fee: ${fee}</p>
+        <div class="actions">
+          <button class="secondary" data-action="suspend">Suspend</button>
+          <button data-action="active">Reactivate</button>
+          <button class="secondary" data-action="permanently_disabled">
+            Permanently Disable
+          </button>
+        </div>
+      `;
+
+      card.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () =>
+          changeCafeLicense(cafe.id, button.dataset.action, cafe.license_status)
+        );
+      });
+
+      if (status === "permanently_disabled") {
+        card.querySelector('[data-action="active"]').disabled = true;
+        card.querySelector('[data-action="suspend"]').disabled = true;
+      }
+
+      if (status === "active") {
+        card.querySelector('[data-action="active"]').disabled = true;
+      }
+
+      if (status === "suspended") {
+        card.querySelector('[data-action="suspend"]').disabled = true;
+      }
+
+      list.appendChild(card);
+    });
+
+    message(
+      "cafeListMessage",
+      "Loaded " + data.total + " cafe(s).",
+      "success"
+    );
+
+  } catch (error) {
+    console.error("Cafe list error:", error);
+    list.textContent = "";
+    message("cafeListMessage", error.message, "error");
+  }
+}
+
+async function changeCafeLicense(businessId, newStatus, oldStatus) {
+  if (!authorized) {
+    return alert("Super Admin authorization required.");
+  }
+
+  if (oldStatus === "permanently_disabled") {
+    return alert("This cafe is permanently disabled and cannot be reactivated.");
+  }
+
+  let reason = "";
+
+  if (newStatus !== "active") {
+    reason = prompt("Enter reason for this license change:");
+
+    if (reason === null) return;
+
+    reason = reason.trim();
+
+    if (!reason) {
+      return alert("A reason is required.");
+    }
+  }
+
+  const labels = {
+    active: "REACTIVATE",
+    suspended: "SUSPEND",
+    permanently_disabled: "PERMANENTLY DISABLE"
+  };
+
+  if (!confirm(
+    "Are you sure you want to " +
+    labels[newStatus] +
+    " this cafe?\n\nThis action will be recorded in the audit log."
+  )) return;
+
+  try {
+    const { data, error } =
+      await supabaseClient.functions.invoke("manage-cafe-license", {
+        body: {
+          business_id: businessId,
+          new_status: newStatus,
+          reason
+        }
+      });
+
+    if (error) throw error;
+
+    if (!data?.success) {
+      throw new Error(data?.error || "License update failed.");
+    }
+
+    alert("License updated successfully.");
+    await loadCafes();
+
+  } catch (error) {
+    console.error("License update error:", error);
+    alert(error.message || "License update failed.");
   }
 }
 
