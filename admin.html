@@ -1,0 +1,357 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BaitHak — Super Admin</title>
+<style>
+:root{
+  --bg:#10100f;--panel:#1b1b19;--line:#34342f;
+  --text:#f5f1e8;--muted:#a7a397;--green:#31c879;
+  --red:#f07870;--gold:#d8ad63;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:14px Inter,system-ui,Arial;
+}
+header{
+  padding:18px 25px;border-bottom:1px solid var(--line);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.brand{font-size:20px;font-weight:800}
+.brand span{color:var(--gold)}
+main{max-width:950px;margin:35px auto;padding:18px}
+.card{
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:15px;padding:22px;margin-bottom:18px;
+}
+h1{font-size:27px;margin:0 0 8px}
+h2{font-size:19px;margin-top:0}
+.muted{color:var(--muted)}
+.field{margin:15px 0}
+label{display:block;color:var(--muted);margin-bottom:7px}
+input,select{
+  width:100%;padding:12px;border-radius:9px;
+  border:1px solid var(--line);background:#11110f;
+  color:var(--text);font:inherit;
+}
+button{
+  padding:12px 17px;border:0;border-radius:9px;
+  background:var(--green);color:#07150d;
+  font-weight:800;cursor:pointer;
+}
+button.secondary{background:#30302b;color:white}
+button:disabled{opacity:.5;cursor:not-allowed}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.notice{
+  padding:13px;border-radius:9px;background:#29251c;
+  border:1px solid #51442b;color:#e7c77d;
+  margin:15px 0;line-height:1.5;
+}
+.message{margin-top:15px;line-height:1.6;white-space:pre-wrap}
+.success{color:var(--green)}
+.error{color:var(--red)}
+.hidden{display:none!important}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:600px){
+  main{margin:15px auto}
+  .grid{grid-template-columns:1fr}
+  header{padding:15px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">☕ <span>BaitHak</span> SUPER ADMIN</div>
+  <button id="logoutBtn" class="secondary hidden" onclick="logout()">Logout</button>
+</header>
+
+<main>
+
+<section id="loginSection" class="card">
+  <h1>Super Admin Login</h1>
+  <p class="muted">Login using your authorized administrator account.</p>
+
+  <div class="field">
+    <label>Email</label>
+    <input id="loginEmail" type="email" autocomplete="username">
+  </div>
+
+  <div class="field">
+    <label>Password</label>
+    <input id="loginPassword" type="password" autocomplete="current-password">
+  </div>
+
+  <div class="actions">
+    <button id="loginBtn" onclick="login()">Login</button>
+  </div>
+  <div id="loginMessage" class="message"></div>
+</section>
+
+<section id="dashboardSection" class="hidden">
+  <div class="card">
+    <h1>Super Admin Dashboard</h1>
+    <p class="muted">Manage cafe owner accounts.</p>
+    <div class="notice">
+      Only create accounts after receiving the cafe owner's payment.
+      Never share the Super Admin login credentials.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Create New Cafe Account</h2>
+
+    <div class="field">
+      <label>Account Creation Mode</label>
+      <select id="mode" onchange="changeMode()">
+        <option value="manual">Manual Password</option>
+        <option value="invite">Send Setup Invitation</option>
+      </select>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label>Cafe Name</label>
+        <input id="cafeName" placeholder="Example Cafe">
+      </div>
+
+      <div class="field">
+        <label>Owner Name</label>
+        <input id="ownerName" placeholder="Owner full name">
+      </div>
+
+      <div class="field">
+        <label>Owner Email</label>
+        <input id="ownerEmail" type="email" placeholder="owner@gmail.com">
+      </div>
+
+      <div class="field">
+        <label>Mobile Number</label>
+        <input id="mobile" type="tel" placeholder="+91 9876543210">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Cafe Address</label>
+      <input id="address" placeholder="Cafe full address">
+    </div>
+
+    <div class="field" id="passwordField">
+      <label>Owner Password (minimum 12 characters)</label>
+      <input id="ownerPassword" type="password"
+        autocomplete="new-password" placeholder="Set owner password">
+    </div>
+
+    <div class="notice" id="modeNotice">
+      You will set the owner's password manually.
+    </div>
+
+    <div class="actions">
+      <button id="createBtn" onclick="createCafe()">
+        Create Cafe Account
+      </button>
+    </div>
+
+    <div id="createMessage" class="message"></div>
+  </div>
+</section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const SUPABASE_URL = "https://ccyzeqzolduiwiwzvnpn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_A2poYEG4ajtURE4CiOqTtA_NXEmhgbs";
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+let authorized = false;
+
+function message(id,text,type=""){
+  const el=document.getElementById(id);
+  el.textContent=text;
+  el.className="message "+type;
+}
+
+function changeMode(){
+  const mode=document.getElementById("mode").value;
+  const manual=mode==="manual";
+
+  document.getElementById("passwordField")
+    .classList.toggle("hidden",!manual);
+
+  document.getElementById("ownerPassword").value="";
+
+  document.getElementById("modeNotice").textContent=manual
+    ? "You will set the owner's password manually."
+    : "An invitation email will be requested from Supabase. Email delivery must be configured.";
+}
+
+async function verifyAdmin(){
+  const {data,error}=await supabaseClient.rpc(
+    "is_current_user_super_admin"
+  );
+
+  if(error || data!==true){
+    authorized=false;
+    await supabaseClient.auth.signOut();
+    document.getElementById("dashboardSection").classList.add("hidden");
+    document.getElementById("loginSection").classList.remove("hidden");
+    document.getElementById("logoutBtn").classList.add("hidden");
+    message("loginMessage","Super Admin access denied.","error");
+    return false;
+  }
+
+  authorized=true;
+  document.getElementById("loginSection").classList.add("hidden");
+  document.getElementById("dashboardSection").classList.remove("hidden");
+  document.getElementById("logoutBtn").classList.remove("hidden");
+  return true;
+}
+
+async function login(){
+  const btn=document.getElementById("loginBtn");
+  const email=document.getElementById("loginEmail").value.trim();
+  const password=document.getElementById("loginPassword").value;
+
+  if(!email || !password){
+    return message("loginMessage","Enter email and password.","error");
+  }
+
+  btn.disabled=true;
+  message("loginMessage","Checking login...");
+
+  try{
+    const {error}=await supabaseClient.auth.signInWithPassword({
+      email,password
+    });
+
+    if(error) throw error;
+
+    await verifyAdmin();
+
+  }catch(error){
+    message("loginMessage",error.message,"error");
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+async function logout(){
+  authorized=false;
+  await supabaseClient.auth.signOut();
+  document.getElementById("dashboardSection").classList.add("hidden");
+  document.getElementById("loginSection").classList.remove("hidden");
+  document.getElementById("logoutBtn").classList.add("hidden");
+  document.getElementById("loginPassword").value="";
+}
+
+async function createCafe(){
+  if(!authorized){
+    return message("createMessage","Admin authorization required.","error");
+  }
+
+  const mode=document.getElementById("mode").value;
+  const cafe_name=document.getElementById("cafeName").value.trim();
+  const owner_name=document.getElementById("ownerName").value.trim();
+  const email=document.getElementById("ownerEmail").value.trim();
+  const mobile=document.getElementById("mobile").value.trim();
+  const address=document.getElementById("address").value.trim();
+  const password=document.getElementById("ownerPassword").value;
+
+  if(!cafe_name || !owner_name || !email || !mobile || !address){
+    return message("createMessage","Please fill all cafe and owner details.","error");
+  }
+
+  if(mode==="manual" && password.length<12){
+    return message("createMessage","Password must contain at least 12 characters.","error");
+  }
+
+  if(!confirm("Create this cafe owner account?")){
+    return;
+  }
+
+  const btn=document.getElementById("createBtn");
+  btn.disabled=true;
+  btn.textContent="Creating...";
+  message("createMessage","Creating cafe account. Please wait...");
+
+  try{
+    const {data:sessionData,error:sessionError}=
+      await supabaseClient.auth.getSession();
+
+    if(sessionError) throw sessionError;
+
+    const token=sessionData.session?.access_token;
+
+    if(!token) throw new Error("Please login again.");
+
+    const {data,error}=await supabaseClient.functions.invoke(
+      "create-cafe-owner",
+      {
+        body:{
+          mode,
+          cafe_name,
+          owner_name,
+          email,
+          mobile,
+          address,
+          password:mode==="manual"?password:""
+        }
+      }
+    );
+
+    if(error) throw error;
+
+    if(!data?.success){
+      throw new Error(data?.message || "Cafe creation failed.");
+    }
+
+    message(
+      "createMessage",
+      "SUCCESS! Cafe account created.\n"+
+      "Cafe: "+cafe_name+"\n"+
+      "Owner: "+owner_name+"\n"+
+      "Email: "+email+"\n"+
+      "Business ID: "+data.business_id+
+      (mode==="invite"
+        ? "\nInvitation email requested. Confirm delivery before giving access."
+        : "\nManual password account created."),
+      "success"
+    );
+
+    document.getElementById("cafeName").value="";
+    document.getElementById("ownerName").value="";
+    document.getElementById("ownerEmail").value="";
+    document.getElementById("mobile").value="";
+    document.getElementById("address").value="";
+    document.getElementById("ownerPassword").value="";
+
+  }catch(error){
+    console.error(error);
+    message("createMessage",error.message || "Account creation failed.","error");
+  }finally{
+    btn.disabled=false;
+    btn.textContent="Create Cafe Account";
+  }
+}
+
+async function initialize(){
+  const {data}=await supabaseClient.auth.getSession();
+  if(data.session){
+    await verifyAdmin();
+  }
+}
+
+initialize();
+</script>
+
+</body>
+</html>
