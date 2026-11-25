@@ -512,6 +512,9 @@ async function loadCafes() {
 }
 
 async function changeCafeLicense(businessId, newStatus, oldStatus) {
+  if (newStatus === "suspend") {
+  newStatus = "suspended";
+}
   if (!authorized) {
     return alert("Super Admin authorization required.");
   }
