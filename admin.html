@@ -556,7 +556,23 @@ async function changeCafeLicense(businessId, newStatus, oldStatus) {
         }
       });
 
-    if (error) throw error;
+   if (error) {
+  console.error("LICENSE FUNCTION ERROR:", error);
+
+  let details = "";
+
+  try {
+    const response = error.context;
+    if (response && typeof response.json === "function") {
+      const result = await response.json();
+      details = JSON.stringify(result);
+    }
+  } catch (e) {
+    details = error.message;
+  }
+
+  throw new Error(details || error.message);
+}
 
     if (!data?.success) {
       throw new Error(data?.error || "License update failed.");
