@@ -208,14 +208,19 @@ if(modalType==='staff'){if(!val('name').trim())return alert('Enter employee name
 closeModal();persist()}
 function markAttendance(id){let s=db.staff.find(x=>x.id===id);s.attendance=s.attendance||{};s.attendance[today()]=s.attendance[today()]==='Present'?'Absent':'Present';persist()}
 function adjustStock(id){let s=db.stock.find(x=>x.id===id);let n=prompt('Enter new quantity for '+s.name,s.qty);if(n!==null&&!isNaN(+n)&&+n>=0){s.qty=+n;persist()}}
-function render(){let d=today(),orders=[...(cloudCustomerOrders||[]),...(db.orders||[])],expenses=db.expenses||[],stock=db.stock||[],staff=db.staff||[];
+let cloudCustomerOrders = [];
+let customerOrderPoller = null;
+let knownCustomerOrderIds = null;
+let orderAudioContext = null;
+let orderSoundEnabled = false;
+  function render(){let d=today(),orders=[...(cloudCustomerOrders||[]),...(db.orders||[])],expenses=db.expenses||[],stock=db.stock||[],staff=db.staff||[];
  document.querySelectorAll('#dashboard .grid .card').forEach((c,i)=>{c.style.display=((currentRole==='Waiter'||currentRole==='Cashier')&&i>1)?'none':'block'});
  document.querySelector('#dashboard .two').style.display=(currentRole==='Waiter'||currentRole==='Cashier')?'none':'grid';
  document.querySelector('#dashboard .section.card').style.display=(currentRole==='Waiter'||currentRole==='Cashier')?'none':'block';let todays=orders.filter(x=>x.date===d),te=expenses.filter(x=>x.date===d),sales=todays.reduce((a,x)=>a+x.total,0),cost=te.reduce((a,x)=>a+x.amount,0),allSales=orders.reduce((a,x)=>a+x.total,0),allCost=expenses.reduce((a,x)=>a+x.amount,0);
 document.getElementById('todayText').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 [['salesMetric',money(sales)],['ordersMetric',todays.length],['expenseMetric',money(cost)],['netMetric',money(sales-cost)],['stockCount',stock.length],['lowCount',stock.filter(x=>x.qty<=x.min).length],['staffCount',staff.length],['presentCount',staff.filter(x=>x.attendance?.[d]==='Present').length],['allExpense',money(allCost)],['expenseEntries',expenses.length],['reportSales',money(allSales)],['reportExpenses',money(allCost)],['reportNet',money(allSales-allCost)],['reportOrders',orders.length]].forEach(([id,v])=>{let e=document.getElementById(id);if(e)e.textContent=v});
 document.getElementById('recentOrders').innerHTML=orders.slice(0,5).map(o=>`<div class="listrow"><div><b>${esc(o.customer||'Walk-in')}</b><div class="small">${esc(o.items)}</div></div><div style="text-align:right"><b>${money(o.total)}</b><div class="small">${esc(o.time||o.date)}</div></div></div>`).join('')||'<div class="empty">No orders yet. Create your first order.</div>';
-document.getElementById('ordersTable').innerHTML=orders.map(o=>`<tr> <td>#${String(o.id).slice(-5)}</td> <td>${esc(o.customer||'Walk-in')}</td> <td>${esc(o.items)}</td> <td>${esc(o.payment)}</td> <td>${o.isCloud ? ` <select onchange="updateCustomerOrderStatus(${o.id},this.value)"> <option value="new" ${o.status==='new'?'selected':''}>New</option> <option value="preparing" ${o.status==='preparing'?'selected':''}>Preparing</option> ${o.status==='ready'?'selected':''}>Ready</option> <option value="served" ${o.status==='served'?'selected':''}>Served</option> </select> <div>${money(o.total)}</div> ` : (o.status==='New order'?'<span class="pill warn">To be billed</span>':money(o.total))}</td> <td>${esc(o.time||o.date)}</td> </tr>`).join('')||'<tr><td colspan="6" class="empty">No orders recorded</td></tr>';
+document.getElementById('ordersTable').innerHTML=orders.map(o=>`<tr> <td>#${String(o.id).slice(-5)}</td> <td>${esc(o.customer||'Walk-in')}</td> <td>${esc(o.items)}</td> <td>${esc(o.payment)}</td> <td>${o.isCloud ? ` <select onchange="updateCustomerOrderStatus(${o.id},this.value)"> <option value="new" ${o.status==='new'?'selected':''}>New</option> <option value="preparing" ${o.status==='preparing'?'selected':''}>Preparing</option>  <option value="served" ${o.status==='served'?'selected':''}>Served</option> </select> <div>${money(o.total)}</div> ` : (o.status==='New order'?'<span class="pill warn">To be billed</span>':money(o.total))}</td> <td>${esc(o.time||o.date)}</td> </tr>`).join('')||'<tr><td colspan="6" class="empty">No orders recorded</td></tr>';
 document.getElementById('expenseTable').innerHTML=expenses.map(e=>`<tr><td>${esc(e.category)}</td><td>${esc(e.description)}</td><td>${money(e.amount)}</td><td>${esc(e.date)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No expenses recorded</td></tr>';
 document.getElementById('stockTable').innerHTML=stock.map(s=>`<tr><td>${esc(s.name)}</td><td>${s.qty}</td><td>${esc(s.unit)}</td><td>${s.min}</td><td><span class="pill ${s.qty<=s.min?'red':''}">${s.qty<=s.min?'Low stock':'In stock'}</span></td><td><button class="secondary" onclick="adjustStock(${s.id})">Update</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No inventory items yet</td></tr>';
 document.getElementById('staffTable').innerHTML=staff.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.role)}</td><td>${esc(s.phone)}</td><td><span class="pill ${s.attendance?.[d]==='Present'?'':'warn'}">${s.attendance?.[d]||'Not marked'}</span></td><td><button class="secondary" onclick="markAttendance(${s.id})">Toggle attendance</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No staff added yet</td></tr>';
@@ -641,11 +646,6 @@ function cloudStatus(message) {
   const el = document.querySelector('.topright .status');
   if (el) el.textContent = message;
 }
-let cloudCustomerOrders = [];
-let customerOrderPoller = null;
-let knownCustomerOrderIds = null;
-let orderAudioContext = null;
-let orderSoundEnabled = false;
 
 function playNewOrderSound() {
   if (!orderSoundEnabled || !orderAudioContext) return;
