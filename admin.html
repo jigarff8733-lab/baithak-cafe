@@ -194,26 +194,56 @@ function changeMode(){
     : "An invitation email will be requested from Supabase. Email delivery must be configured.";
 }
 
-async function verifyAdmin(){
-  const {data,error}=await supabaseClient.rpc(
-    "is_current_user_super_admin"
-  );
 
-  if(error || data!==true){
-    authorized=false;
-    await supabaseClient.auth.signOut();
-    document.getElementById("dashboardSection").classList.add("hidden");
-    document.getElementById("loginSection").classList.remove("hidden");
-    document.getElementById("logoutBtn").classList.add("hidden");
-    message("loginMessage","Super Admin access denied.","error");
+async function verifyAdmin(){
+  const loginSection = document.getElementById("loginSection");
+  const dashboardSection = document.getElementById("dashboardSection");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  try {
+    const { data: sessionData, error: sessionError } =
+      await supabaseClient.auth.getSession();
+
+    if (sessionError || !sessionData.session) {
+      throw new Error("Please login first.");
+    }
+
+    const { data, error } =
+      await supabaseClient.functions.invoke("verify-super-admin", {
+        method: "POST"
+      });
+
+    if (error) throw error;
+
+    if (!data || data.success !== true) {
+      throw new Error(data?.message || "Super Admin access denied.");
+    }
+
+    authorized = true;
+
+    loginSection.classList.add("hidden");
+    dashboardSection.classList.remove("hidden");
+    logoutBtn.classList.remove("hidden");
+
+    message("loginMessage", "Super Admin verified successfully.", "success");
+
+    return true;
+
+  } catch (error) {
+    authorized = false;
+
+    dashboardSection.classList.add("hidden");
+    loginSection.classList.remove("hidden");
+    logoutBtn.classList.add("hidden");
+
+    message(
+      "loginMessage",
+      error.message || "Super Admin verification failed.",
+      "error"
+    );
+
     return false;
   }
-
-  authorized=true;
-  document.getElementById("loginSection").classList.add("hidden");
-  document.getElementById("dashboardSection").classList.remove("hidden");
-  document.getElementById("logoutBtn").classList.remove("hidden");
-  return true;
 }
 
 async function login(){
