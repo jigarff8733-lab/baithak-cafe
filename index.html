@@ -662,6 +662,7 @@ const supabaseClient = window.supabase.createClient(
 let cloudBusinessId = null;
 let cloudUserId = null;
 let cloudReady = false;
+let cloudReadOnly = false;
 let cloudSaveTimer = null;
 let cloudSaveBusy = false;
 let cloudSaveAgain = false;
@@ -1465,48 +1466,17 @@ setupOrderSoundButton();
     await loadCustomerOrders();
   }
 }
-async function startCloud() {
-  try {
-    cloudStatus('Connecting...');
+} else {
+  const upload = await supabaseClient
+    .from('cafe_app_data')
+    .insert({
+      business_id: cloudBusinessId,
+      owner_user_id: cloudUserId,
+      data: db
+    });
 
-    let { data: sessionData, error } =
-      await supabaseClient.auth.getSession();
-
-    if (error) throw error;
-
-    let user = sessionData.session?.user;
-
-    if (!user) {
-      const email = prompt('Enter Owner email:');
-      if (!email) return;
-
-      const password = prompt('Enter Owner password:');
-      if (!password) return;
-
-      const login = await supabaseClient.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (login.error) throw login.error;
-      user = login.data.user;
-    }
-
-    cloudUserId = user.id;
-
-    const membershipResult = await supabaseClient
-  .from('memberships')
-  .select('business_id')
-  .eq('user_id', user.id)
-  .eq('role', 'owner')
-  .limit(1)
-  .maybeSingle();
-
-if (membershipResult.error) throw membershipResult.error;
-if (!membershipResult.data) {
-  throw new Error('Owner membership record not found.');
+  if (upload.error) throw upload.error;
 }
-
 cloudBusinessId = membershipResult.data.business_id;
 
     const result = await supabaseClient
@@ -1559,9 +1529,11 @@ cloudStatus('● Cloud connected');
   }
 }
 
+
 async function saveCloudData() {
   if (!cloudReady) return;
 
+  // Agar save already chal raha hai, next save queue karo.
   if (cloudSaveBusy) {
     cloudSaveAgain = true;
     return;
@@ -1570,26 +1542,44 @@ async function saveCloudData() {
   cloudSaveBusy = true;
 
   try {
-    const { error } = await supabaseClient
-      .from('cafe_app_data')
-      .upsert({
-        business_id: cloudBusinessId,
-        owner_user_id: cloudUserId,
-        data: db,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'business_id' });
+    do {
+      cloudSaveAgain = false;
 
-    if (error) throw error;
+      const dataToSave = JSON.parse(JSON.stringify(db));
+
+      const { error } = await supabaseClient
+        .from('cafe_app_data')
+        .upsert(
+          {
+            business_id: cloudBusinessId,
+            owner_user_id: cloudUserId,
+            data: dataToSave,
+            updated_at: new Date().toISOString()
+          },
+          {
+            onConflict: 'business_id'
+          }
+        );
+
+      if (error) {
+        throw error;
+      }
+
+    } while (cloudSaveAgain);
 
     cloudStatus('● Cloud synced');
 
   } catch (error) {
     cloudStatus('● Sync failed');
+
     console.error('Cloud save error:', error);
+
     alert('Cloud save failed: ' + error.message);
+
   } finally {
     cloudSaveBusy = false;
 
+    // Agar save ke end hote waqt koi naya save request aaya ho.
     if (cloudSaveAgain) {
       cloudSaveAgain = false;
       saveCloudData();
