@@ -160,7 +160,34 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
 
 <section class="page" id="reports"><div class="welcome"><div><div class="tag">BUSINESS INSIGHTS</div><h1>Reports</h1><div class="muted">Sales, expenses and estimated net</div></div><button class="secondary" onclick="exportCSV()">Export CSV</button></div><div class="grid"><div class="card"><div class="metriclabel">Total sales</div><div class="metric" id="reportSales">₹0</div></div><div class="card"><div class="metriclabel">Total expenses</div><div class="metric" id="reportExpenses">₹0</div></div><div class="card"><div class="metriclabel">Estimated net</div><div class="metric" id="reportNet">₹0</div></div><div class="card"><div class="metriclabel">Total orders</div><div class="metric" id="reportOrders">0</div></div></div><div class="notice">Net here means recorded sales minus recorded expenses. It is not a tax or audited profit statement.</div></section>
 
-<section class="page" id="settings">   <div class="welcome">     <div>       <div class="tag">PREFERENCES</div>       <h1>Settings & Backup</h1>       <div class="muted">Manage cafe payment details and records</div>     </div>   </div>    <div class="card">     <h2>Cafe Payment Settings</h2>     <p class="muted">Enter the cafe owner's UPI details for customer payments.</p>      <div class="field">       <label>UPI ID</label>       <input id="cafeUpiId" placeholder="example@upi">     </div>      <div class="field" style="margin-top:12px">       <label>Payee Name</label>       <input id="cafePayeeName" placeholder="Cafe owner name">     </div>      <div class="actions" style="margin-top:14px">       <button onclick="savePaymentSettings()">Save Payment Details</button>     </div>     <div id="paymentSettingsMessage" class="muted" style="margin-top:10px"></div>   </div>    <div class="card section">     <h2>Data backup</h2>     <p class="muted">Download a JSON backup or restore a previous backup on this device.</p>     <div class="actions">       <button onclick="backup()">Download backup</button>       <label class="secondary" style="padding:10px 14px;border-radius:10px;cursor:pointer">         Restore backup         <input type="file" accept="application/json" onchange="restore(event)" hidden>       </label>     </div>   </div>    <div class="section card">     <h2>Multi-device cloud sync</h2>     <div class="notice">Cloud data is connected through Supabase. Keep your account credentials private.</div>     <span class="pill">Cloud connected</span>   </div>    <div class="section card">     <h2>Demo data</h2>     <p class="muted">Clear all locally saved demo/business records from this browser.</p>     <button class="danger" onclick="clearData()">Clear all data</button>   </div> </section>
+<section class="page" id="settings">   <div class="welcome">     <div>       <div class="tag">PREFERENCES</div>       <h1>Settings & Backup</h1>       <div class="muted">Manage cafe payment details and records</div>     </div>   </div>   <div class="card">
+  <h2>Cafe Profile</h2>
+  <p class="muted">These details will appear on printed customer receipts.</p>
+
+  <div class="field">
+    <label>Cafe Name</label>
+    <input id="cafeName" placeholder="BaitHak Cafe">
+  </div>
+
+  <div class="field" style="margin-top:12px">
+    <label>Cafe Address</label>
+    <textarea id="cafeAddress" rows="2"
+      placeholder="Main Road, Gujarat, India"></textarea>
+  </div>
+
+  <div class="field" style="margin-top:12px">
+    <label>Mobile Number</label>
+    <input id="cafePhone" type="tel"
+      placeholder="+91 99999 99999">
+  </div>
+
+  <div class="actions" style="margin-top:14px">
+    <button onclick="saveCafeProfile()">Save Cafe Profile</button>
+  </div>
+
+  <div id="cafeProfileMessage" class="muted"
+    style="margin-top:10px"></div>
+</div> <div class="card">     <h2>Cafe Payment Settings</h2>     <p class="muted">Enter the cafe owner's UPI details for customer payments.</p>      <div class="field">       <label>UPI ID</label>       <input id="cafeUpiId" placeholder="example@upi">     </div>      <div class="field" style="margin-top:12px">       <label>Payee Name</label>       <input id="cafePayeeName" placeholder="Cafe owner name">     </div>      <div class="actions" style="margin-top:14px">       <button onclick="savePaymentSettings()">Save Payment Details</button>     </div>     <div id="paymentSettingsMessage" class="muted" style="margin-top:10px"></div>   </div>    <div class="card section">     <h2>Data backup</h2>     <p class="muted">Download a JSON backup or restore a previous backup on this device.</p>     <div class="actions">       <button onclick="backup()">Download backup</button>       <label class="secondary" style="padding:10px 14px;border-radius:10px;cursor:pointer">         Restore backup         <input type="file" accept="application/json" onchange="restore(event)" hidden>       </label>     </div>   </div>    <div class="section card">     <h2>Multi-device cloud sync</h2>     <div class="notice">Cloud data is connected through Supabase. Keep your account credentials private.</div>     <span class="pill">Cloud connected</span>   </div>    <div class="section card">     <h2>Demo data</h2>     <p class="muted">Clear all locally saved demo/business records from this browser.</p>     <button class="danger" onclick="clearData()">Clear all data</button>   </div> </section>
 </main></div>
 
 <div class="modal" id="modal"><div class="modalbox"><div id="modalContent"></div><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button id="saveBtn" onclick="saveModal()">Save</button></div></div></div>
@@ -785,14 +812,9 @@ function setupOrderSoundButton() {
  async function loadPaymentSettings() {
   if (!supabaseClient || !cloudBusinessId) return;
 
-  const upiInput = document.getElementById('cafeUpiId');
-  const payeeInput = document.getElementById('cafePayeeName');
-
-  if (!upiInput || !payeeInput) return;
-
   const { data, error } = await supabaseClient
     .from('business_payment_settings')
-    .select('upi_id, payee_name')
+    .select('upi_id, payee_name, cafe_name, cafe_address, cafe_phone')
     .eq('business_id', cloudBusinessId)
     .maybeSingle();
 
@@ -801,10 +823,21 @@ function setupOrderSoundButton() {
     return;
   }
 
-  upiInput.value = data?.upi_id || '';
-  payeeInput.value = data?.payee_name || '';
-}
+  if (!data) return;
 
+  const upiInput = document.getElementById('cafeUpiId');
+  const payeeInput = document.getElementById('cafePayeeName');
+  const nameInput = document.getElementById('cafeName');
+  const addressInput = document.getElementById('cafeAddress');
+  const phoneInput = document.getElementById('cafePhone');
+
+  if (upiInput) upiInput.value = data.upi_id || '';
+  if (payeeInput) payeeInput.value = data.payee_name || '';
+
+  if (nameInput) nameInput.value = data.cafe_name || 'BaitHak Cafe';
+  if (addressInput) addressInput.value = data.cafe_address || 'Main Road, Gujarat, India';
+  if (phoneInput) phoneInput.value = data.cafe_phone || '+91 99999 99999';
+}
 async function savePaymentSettings() {
   const upiInput = document.getElementById('cafeUpiId');
   const payeeInput = document.getElementById('cafePayeeName');
@@ -849,6 +882,47 @@ async function savePaymentSettings() {
   }
 
   message.textContent = 'Payment details saved successfully.';
+}
+async function saveCafeProfile() {
+  const name = document.getElementById('cafeName').value.trim();
+  const address = document.getElementById('cafeAddress').value.trim();
+  const phone = document.getElementById('cafePhone').value.trim();
+  const message = document.getElementById('cafeProfileMessage');
+
+  if (!name || !address || !phone) {
+    message.textContent = 'Please enter all cafe details.';
+    return;
+  }
+
+  if (!supabaseClient || !cloudBusinessId) {
+    message.textContent = 'Business is not connected. Please try again.';
+    return;
+  }
+
+  message.textContent = 'Saving...';
+
+  const { data, error } = await supabaseClient
+    .from('business_payment_settings')
+    .update({
+      cafe_name: name,
+      cafe_address: address,
+      cafe_phone: phone
+    })
+    .eq('business_id', cloudBusinessId)
+    .select('id');
+
+  if (error) {
+    message.textContent = 'Save failed: ' + error.message;
+    console.error('Cafe profile save error:', error);
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    message.textContent = 'Payment settings not found. Save UPI details first.';
+    return;
+  }
+
+  message.textContent = 'Cafe profile saved successfully.';
 }
   async function openBillPayment(sessionId) {
   const { data: session, error } = await supabaseClient
@@ -1010,7 +1084,11 @@ async function printTableBill(sessionId) {
     alert('Unable to load receipt.');
     return;
   }
-
+  const { data: profile } = await supabaseClient
+    .from('business_payment_settings')
+    .select('cafe_name, cafe_address, cafe_phone')
+    .eq('business_id', cloudBusinessId)
+    .maybeSingle();
   const safe = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;',
     '<': '&lt;',
@@ -1117,9 +1195,9 @@ async function printTableBill(sessionId) {
     </head>
     <body>
       <div class="center">
-        <div class="brand">BAITHAK CAFE</div>
-        <div class="muted">Main Road, Gujarat, India</div>
-        <div class="muted">Mobile: +91 99999 99999 (Sample)</div>
+               <div class="brand">${safe(profile?.cafe_name || 'BaitHak Cafe')}</div>
+        <div class="muted">${safe(profile?.cafe_address || 'Main Road, Gujarat, India')}</div>
+        <div class="muted">Mobile: ${safe(profile?.cafe_phone || '+91 99999 99999')}</div>
         <h3>INVOICE / RECEIPT</h3>
       </div>
 
