@@ -205,6 +205,7 @@ closeModal();persist()}
 function markAttendance(id){let s=db.staff.find(x=>x.id===id);s.attendance=s.attendance||{};s.attendance[today()]=s.attendance[today()]==='Present'?'Absent':'Present';persist()}
 function adjustStock(id){let s=db.stock.find(x=>x.id===id);let n=prompt('Enter new quantity for '+s.name,s.qty);if(n!==null&&!isNaN(+n)&&+n>=0){s.qty=+n;persist()}}
 let cloudCustomerOrders = [];
+let lastCustomerOrdersRenderKey = '';
 let customerOrderPoller = null;
 let knownCustomerOrderIds = null;
 let orderAudioContext = null;
@@ -1212,9 +1213,15 @@ async function loadCustomerOrders() {
       };
     });
 
-    render();
-    loadRunningBills();
-    setupOrderSoundButton();
+   const currentRenderKey = JSON.stringify(cloudCustomerOrders);
+
+if (currentRenderKey !== lastCustomerOrdersRenderKey) {
+  lastCustomerOrdersRenderKey = currentRenderKey;
+  render();
+  loadRunningBills();
+}
+
+setupOrderSoundButton();
 
     if (!customerOrderPoller) {
       customerOrderPoller = setInterval(
