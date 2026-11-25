@@ -217,16 +217,65 @@ async function placeOrder(){
     if(error) throw error;
     if(!data || !data.success) throw new Error('Order could not be placed.');
 
+        const orderId = data.order_id;
+
     document.querySelector('main').innerHTML = `
       <div class="cart" style="text-align:center;margin-top:45px">
         <h1>✓ Order Placed!</h1>
         <p>Your order has been received.</p>
         <h2>${data.order_number}</h2>
         <h3>Total: ₹${Number(data.total).toFixed(2)}</h3>
-        <p>Please wait while we prepare your order.</p>
+
+        <div style="margin:30px 0;padding:20px;border:1px solid #444;border-radius:14px">
+          <h2>Order Tracking</h2>
+          <h3 id="trackingStatus">Order received</h3>
+          <p id="trackingMessage">Your order has been received successfully.</p>
+          <div style="display:flex;justify-content:space-between;margin-top:25px;gap:8px">
+            <div>✓<br>Received</div>
+            <div id="stepPreparing">○<br>Preparing</div>
+            <div id="stepServed">○<br>Served</div>
+          </div>
+        </div>
       </div>
     `;
+
     cart = {};
+
+    async function refreshOrderTracking(){
+     const {data: order,error} = await supabaseClient.rpc(
+  'get_customer_order_status',
+  {
+    p_token: token,
+    p_order_id: orderId
+  }
+);
+
+      if(error){
+        console.error('Tracking error:',error);
+        return;
+      }
+
+      const status = (order.status || 'new').toLowerCase();
+
+      document.getElementById('trackingStatus').textContent =
+        status === 'served' ? 'Served' :
+        status === 'preparing' ? 'Preparing your order' :
+        'Order received';
+
+      document.getElementById('trackingMessage').textContent =
+        status === 'served' ? 'Your order has been served. Enjoy!' :
+        status === 'preparing' ? 'Your order is being prepared.' :
+        'Your order has been received successfully.';
+
+      document.getElementById('stepPreparing').textContent =
+        status === 'new' ? '○\nPreparing' : '✓\nPreparing';
+
+      document.getElementById('stepServed').textContent =
+        status === 'served' ? '✓\nServed' : '○\nServed';
+    }
+
+    refreshOrderTracking();
+    setInterval(refreshOrderTracking,5000);
 
   }catch(e){
     alert('Order failed: ' + e.message);
