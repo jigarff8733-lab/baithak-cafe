@@ -1564,9 +1564,13 @@ async function startCloud() {
 
     if (result.error) throw result.error;
 
-    const localHasData =
-      db.orders.length || db.expenses.length ||
-      db.stock.length || db.staff.length;
+   
+const localHasData =
+  (db.orders?.length || 0) ||
+  (db.expenses?.length || 0) ||
+  (db.stock?.length || 0) ||
+  (db.staff?.length || 0);
+
 
     if (result.data) {
       if (
