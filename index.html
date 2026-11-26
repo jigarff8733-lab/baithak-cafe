@@ -630,7 +630,7 @@ async function deleteCategory(id) {
     const { error } = await supabaseClient.from('categories')
       .delete()
       .eq('id', id)
-      .eq('"business_id"', cloudBusinessId);
+      .eq('business_id', cloudBusinessId);
 
     if (error) throw error;
 
