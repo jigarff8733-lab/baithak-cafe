@@ -17,7 +17,8 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
 </style>
 </head>
 <body>
-<header>   <div class="brand">☕ <span>BaitHak</span> Cafe <small class="muted">MANAGEMENT</small></div>   <div class="topright">     <span class="status">● Local mode</span>     <div class="rolebox">       <select id="roleSelect" aria-label="Choose role" style="width:auto;padding:7px 9px">         <option>Owner</option>         <option>Manager</option>         <option>Cashier</option>         <option>Waiter</option>       </select>     </div>     <button class="danger" onclick="logoutOwner()">Logout</button>   </div> </header><select id="roleSelect" aria-label="Choose role" style="width:auto;padding:7px 9px"><option>Owner</option><option>Manager</option><option>Cashier</option><option>Waiter</option></select></div></div></header>
+<header>   <div class="brand">☕ <span>BaitHak</span> Cafe <small class="muted">MANAGEMENT</small></div>   <div class="topright">     <span class="status">● Local mode</span>     <div class="rolebox">       <select id="roleSelect" aria-label="Choose role" style="width:auto;padding:7px 9px">         <option>Owner</option>         <option>Manager</option>         <option>Cashier</option>         <option>Waiter</option>       </select>     </div>     <button class="danger" onclick="logoutOwner()">Logout</button>   </div> 
+</header>
 <div class="layout">
 <aside>
 <div class="navlabel">WORKSPACE</div>
@@ -1008,7 +1009,7 @@ async function saveCafeProfile() {
         </div>
       ` : `<p style="color:#ffb36b">UPI details not saved. Add them in Settings.</p>`}
 
-      <button onclick="finishTableBill(${session.id},'cash')"
+      <button onclick="finishTableBill('${session.id}','cash')"
         style="width:100%;padding:13px;margin-top:8px;background:#277a50;color:white;border:0;border-radius:9px">
         Cash Received — Mark Paid
       </button>
@@ -1347,7 +1348,7 @@ async function printTableBill(sessionId) {
         </div>
 
         <button
-          onclick="openBillPayment(${session.id})"
+          onclick="openBillPayment('${session.id}')"
           style="width:100%;padding:12px;margin-top:14px;background:#277a50;color:white;border:0;border-radius:9px;cursor:pointer">
           Generate Final Bill & Payment
         </button>
@@ -1447,7 +1448,8 @@ setupOrderSoundButton();
     console.error('Customer orders load error:', error);
   }
 }
-  async function updateCustomerOrderStatus(orderId, newStatus) {
+
+async function updateCustomerOrderStatus(orderId, newStatus) {
   try {
     const { error } = await supabaseClient
       .from('orders')
@@ -1457,7 +1459,10 @@ setupOrderSoundButton();
 
     if (error) throw error;
 
-    const order = cloudCustomerOrders.find(o => o.id === orderId);
+    const order = cloudCustomerOrders.find(
+      o => String(o.id) === String(orderId)
+    );
+
     if (order) order.status = newStatus;
 
     render();
@@ -1466,18 +1471,35 @@ setupOrderSoundButton();
     await loadCustomerOrders();
   }
 }
-} else {
-  const upload = await supabaseClient
-    .from('cafe_app_data')
-    .insert({
-      business_id: cloudBusinessId,
-      owner_user_id: cloudUserId,
-      data: db
-    });
+ 
+async function startCloud() {
+  try {
+    const { data: { session }, error: sessionError } =
+      await supabaseClient.auth.getSession();
 
-  if (upload.error) throw upload.error;
-}
-cloudBusinessId = membershipResult.data.business_id;
+    if (sessionError) throw sessionError;
+
+    if (!session) {
+      cloudStatus('● Please login');
+      return;
+    }
+
+    cloudUserId = session.user.id;
+
+    const membershipResult = await supabaseClient
+      .from('memberships')
+      .select('business_id, role')
+      .eq('user_id', cloudUserId)
+      .limit(1)
+      .maybeSingle();
+
+    if (membershipResult.error) throw membershipResult.error;
+
+    if (!membershipResult.data) {
+      throw new Error('No cafe membership found for this account.');
+    }
+
+    cloudBusinessId = membershipResult.data.business_id;
 
     const result = await supabaseClient
       .from('cafe_app_data')
@@ -1492,8 +1514,10 @@ cloudBusinessId = membershipResult.data.business_id;
       db.stock.length || db.staff.length;
 
     if (result.data) {
-      if (localHasData &&
-          !confirm('Cloud data already exists. Replace local data with cloud data? Download a local backup first if needed.')) {
+      if (
+        localHasData &&
+        !confirm('Cloud data already exists. Replace local data with cloud data? Download a local backup first if needed.')
+      ) {
         cloudStatus('Local mode - sync paused');
         return;
       }
@@ -1502,7 +1526,7 @@ cloudBusinessId = membershipResult.data.business_id;
       localStorage.setItem(KEY, JSON.stringify(db));
       render();
     } else {
-      const upload = await supabaseClient
+      const { error: uploadError } = await supabaseClient
         .from('cafe_app_data')
         .insert({
           business_id: cloudBusinessId,
@@ -1510,15 +1534,15 @@ cloudBusinessId = membershipResult.data.business_id;
           data: db
         });
 
-      if (upload.error) throw upload.error;
+      if (uploadError) throw uploadError;
     }
 
-   cloudReady = true;
-loadMenu();
-loadTables();
-loadCustomerOrders();
-await loadPaymentSettings();    
-cloudStatus('● Cloud connected');
+    cloudReady = true;
+    loadMenu();
+    loadTables();
+    loadCustomerOrders();
+    await loadPaymentSettings();
+    cloudStatus('● Cloud connected');
     console.log('BAITHAK CLOUD SYNC READY');
 
   } catch (error) {
@@ -1528,7 +1552,6 @@ cloudStatus('● Cloud connected');
     console.error(error);
   }
 }
-
 
 async function saveCloudData() {
   if (!cloudReady) return;
