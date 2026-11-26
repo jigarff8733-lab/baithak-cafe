@@ -90,6 +90,52 @@ input{width:100%;padding:13px;border-radius:9px;border:1px solid #45453e;backgro
   font-size:12px;
   line-height:1.5;
 }
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #digitalBillArea,
+  #digitalBillArea * {
+    visibility: visible !important;
+  }
+
+  #digitalBillArea {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+  }
+
+  #digitalBillArea h2,
+  #digitalBillArea h3,
+  #digitalBillArea strong,
+  #digitalBillArea span,
+  #digitalBillArea p,
+  #digitalBillArea .bill-item {
+    color: black !important;
+  }
+
+  #digitalBillArea .bill-payment {
+    background: white !important;
+    color: black !important;
+  }
+
+  #digitalBillArea .bill-refresh,
+  #digitalBillArea a {
+    display: none !important;
+  }
+
+  @page {
+    size: auto;
+    margin: 12mm;
+  }
+}
 </style>
 </head>
 <body>
@@ -216,6 +262,7 @@ async function loadCustomerBill(){
         <p class="bill-note">Combined bill for all your orders</p>
       </div>
       <button class="bill-refresh" onclick="loadCustomerBill()">↻ Refresh</button>
+<button class="bill-refresh" onclick="printCustomerBill()">🖨 Print Bill</button>
     </div>
 
     ${ordersHTML}
@@ -413,7 +460,16 @@ async function placeOrder(){
     btn.textContent = 'Place Order';
   }
 }
+function printCustomerBill() {
+  const bill = document.getElementById('digitalBillArea');
 
+  if (!bill || bill.hidden || !bill.innerHTML.trim()) {
+    alert('Bill is not available yet.');
+    return;
+  }
+
+  window.print();
+}
 loadMenu();
 </script>
 </body>
