@@ -405,7 +405,7 @@ async function deleteCafe(businessId, cafeName) {
 
   if (typedName === null) return;
 
-  if (typedName.trim() !== cafeName) {
+  if (typedName.trim() !== cafeName.trim()) {
     alert("Cafe name does not match. Nothing was deleted.");
     return;
   }
