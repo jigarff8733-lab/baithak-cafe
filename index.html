@@ -567,7 +567,7 @@ async function addMenuItem() {
       price: price,
       image_url: imageUrl || null,
       business_id: cloudBusinessId,
-      branch_id: cloudBranchId
+      branch_id: cloudBranchId,
       is_available: true
     });
 
@@ -1574,17 +1574,7 @@ if (!membershipResult.data) {
 
 cloudBusinessId = membershipResult.data.business_id;
 
-const { data: branchData, error: branchError } = await supabaseClient
-  .from('branches')
-  .select('id')
-  .eq('business_id', cloudBusinessId)
-  .limit(1)
-  .single();
-
-if (branchError) throw branchError;
-
-cloudBranchId = membershipResult.data.branch_id || branchData.id;
-
+cloudBranchId = membershipResult.data.branch_id;
     const result = await supabaseClient
       .from('cafe_app_data')
       .select('id,data')
