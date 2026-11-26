@@ -1519,6 +1519,7 @@ async function loginOwner() {
   }
 }
  
+
 async function startCloud() {
   try {
     const { data: { session }, error: sessionError } =
@@ -1526,42 +1527,19 @@ async function startCloud() {
 
     if (sessionError) throw sessionError;
 
-    
-if (!session) {
-  const email = prompt('Enter Owner email:');
-  if (!email) {
-    cloudStatus('● Please login');
-    return;
-  }
+    if (!session) {
+      document.getElementById('ownerLoginScreen').style.display = 'flex';
+      document.querySelector('header').style.display = 'none';
+      document.querySelector('.layout').style.display = 'none';
+      cloudStatus('● Please login');
+      return;
+    }
 
- if (!session) {
-  const email = prompt('Enter Owner email:');
-  if (!email) {
-    cloudStatus('● Please login');
-    return;
-  }
+    cloudUserId = session.user.id;
 
-  const password = prompt('Enter Owner password:');
-  if (!password) {
-    cloudStatus('● Please login');
-    return;
-  }
-
-  const { data: loginData, error: loginError } =
-    await supabaseClient.auth.signInWithPassword({
-      email: email.trim(),
-      password
-    });
-
-  if (loginError) {
-    throw loginError;
-  }
-
-  cloudUserId = loginData.user.id;
-} else {
-  cloudUserId = session.user.id;
-}
-
+    document.getElementById('ownerLoginScreen').style.display = 'none';
+    document.querySelector('header').style.display = '';
+    document.querySelector('.layout').style.display = '';
 
     const membershipResult = await supabaseClient
       .from('memberships')
@@ -1573,7 +1551,7 @@ if (!session) {
     if (membershipResult.error) throw membershipResult.error;
 
     if (!membershipResult.data) {
-      throw new Error('No cafe membership found for this account.');
+      throw new Error('No cafe membership found.');
     }
 
     cloudBusinessId = membershipResult.data.business_id;
@@ -1620,6 +1598,7 @@ if (!session) {
     loadCustomerOrders();
     await loadPaymentSettings();
     cloudStatus('● Cloud connected');
+
     console.log('BAITHAK CLOUD SYNC READY');
 
   } catch (error) {
