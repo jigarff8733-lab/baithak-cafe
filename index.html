@@ -1479,12 +1479,35 @@ async function startCloud() {
 
     if (sessionError) throw sessionError;
 
-    if (!session) {
-      cloudStatus('● Please login');
-      return;
-    }
+    
+if (!session) {
+  const email = prompt('Enter Owner email:');
+  if (!email) {
+    cloudStatus('● Please login');
+    return;
+  }
 
-    cloudUserId = session.user.id;
+  const password = prompt('Enter Owner password:');
+  if (!password) {
+    cloudStatus('● Please login');
+    return;
+  }
+
+  const { data: loginData, error: loginError } =
+    await supabaseClient.auth.signInWithPassword({
+      email: email.trim(),
+      password
+    });
+
+  if (loginError) {
+    throw loginError;
+  }
+
+  cloudUserId = loginData.user.id;
+} else {
+  cloudUserId = session.user.id;
+}
+
 
     const membershipResult = await supabaseClient
       .from('memberships')
