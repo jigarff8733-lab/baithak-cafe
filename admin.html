@@ -532,6 +532,9 @@ async function loadCafes() {
 card.querySelector('[data-action="delete"]').addEventListener("click", () =>
   deleteCafe(cafe.id, cafe.name || cafe.cafe_name || "Unnamed Cafe")
 );
+      if (status === "active") {
+  card.querySelector('[data-action="delete"]').disabled = true;
+}    
       if (status === "permanently_disabled") {
         card.querySelector('[data-action="active"]').disabled = true;
         card.querySelector('[data-action="suspend"]').disabled = true;
