@@ -388,7 +388,7 @@ async function addCafeTable() {
         capacity: capacity,
         status: 'available',
         business_id: cloudBusinessId,
-        branch_id: null
+        branch_id: cloudBranchId
       });
 
     if (error) throw error;
@@ -567,7 +567,7 @@ async function addMenuItem() {
       price: price,
       image_url: imageUrl || null,
       business_id: cloudBusinessId,
-      branch_id: null,
+      branch_id: cloudBranchId
       is_available: true
     });
 
@@ -1536,7 +1536,7 @@ async function loginOwner() {
     message.textContent = error.message;
   }
 }
- 
+let cloudBranchId = null; 
 
 async function startCloud() {
   try {
@@ -1560,19 +1560,30 @@ async function startCloud() {
     document.querySelector('.layout').style.display = '';
 
     const membershipResult = await supabaseClient
-      .from('memberships')
-      .select('business_id, role')
-      .eq('user_id', cloudUserId)
-      .limit(1)
-      .maybeSingle();
+  .from('memberships')
+  .select('business_id, role, branch_id')
+  .eq('user_id', cloudUserId)
+  .limit(1)
+  .maybeSingle();
 
-    if (membershipResult.error) throw membershipResult.error;
+if (membershipResult.error) throw membershipResult.error;
 
-    if (!membershipResult.data) {
-      throw new Error('No cafe membership found.');
-    }
+if (!membershipResult.data) {
+  throw new Error('No cafe membership found.');
+}
 
-    cloudBusinessId = membershipResult.data.business_id;
+cloudBusinessId = membershipResult.data.business_id;
+
+const { data: branchData, error: branchError } = await supabaseClient
+  .from('branches')
+  .select('id')
+  .eq('business_id', cloudBusinessId)
+  .limit(1)
+  .single();
+
+if (branchError) throw branchError;
+
+cloudBranchId = membershipResult.data.branch_id || branchData.id;
 
     const result = await supabaseClient
       .from('cafe_app_data')
