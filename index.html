@@ -17,6 +17,25 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
 </style>
 </head>
 <body>
+
+<div id="ownerLoginScreen" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;background:#10100f">
+  <div style="width:100%;max-width:380px;background:#1b1b19;padding:28px;border-radius:16px;border:1px solid #34342f">
+    <h2 style="text-align:center;color:#f5f1e8">☕ BaitHak Cafe</h2>
+    <p style="text-align:center;color:#aaa">Owner Login</p>
+
+    <label>Email Address</label>
+    <input id="loginEmail" type="email" placeholder="Enter your email" style="width:100%;margin:10px 0;padding:12px">
+
+    <label>Password</label>
+    <input id="loginPassword" type="password" placeholder="Enter your password" style="width:100%;margin:10px 0;padding:12px">
+
+    <button onclick="loginOwner()" style="width:100%;padding:13px;margin-top:12px;background:#277a50;color:white;border:0;border-radius:9px">
+      Login
+    </button>
+    <p id="loginMessage" style="color:#ff7777;text-align:center"></p>
+  </div>
+</div>
+
 <header>   <div class="brand">☕ <span>BaitHak</span> Cafe <small class="muted">MANAGEMENT</small></div>   <div class="topright">     <span class="status">● Local mode</span>     <div class="rolebox">       <select id="roleSelect" aria-label="Choose role" style="width:auto;padding:7px 9px">         <option>Owner</option>         <option>Manager</option>         <option>Cashier</option>         <option>Waiter</option>       </select>     </div>     <button class="danger" onclick="logoutOwner()">Logout</button>   </div> 
 </header>
 <div class="layout">
@@ -1471,6 +1490,34 @@ async function updateCustomerOrderStatus(orderId, newStatus) {
     await loadCustomerOrders();
   }
 }
+
+async function loginOwner() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const message = document.getElementById('loginMessage');
+
+  if (!email || !password) {
+    message.textContent = 'Please enter email and password.';
+    return;
+  }
+
+  message.textContent = 'Logging in...';
+
+  try {
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    message.textContent = 'Login successful...';
+    await startCloud();
+
+  } catch (error) {
+    message.textContent = error.message;
+  }
+}
  
 async function startCloud() {
   try {
@@ -1481,6 +1528,13 @@ async function startCloud() {
 
     
 if (!session) {
+  const email = prompt('Enter Owner email:');
+  if (!email) {
+    cloudStatus('● Please login');
+    return;
+  }
+
+ if (!session) {
   const email = prompt('Enter Owner email:');
   if (!email) {
     cloudStatus('● Please login');
