@@ -398,6 +398,45 @@ function escapeHTML(value) {
   })[char]);
 }
 
+async function deleteCafe(businessId, cafeName) {
+  const typedName = prompt(
+    `PERMANENTLY DELETE "${cafeName}"?\n\nThis cannot be undone.\n\nType the exact cafe name to confirm:`
+  );
+
+  if (typedName === null) return;
+
+  if (typedName.trim() !== cafeName) {
+    alert("Cafe name does not match. Nothing was deleted.");
+    return;
+  }
+
+  if (!confirm(`FINAL WARNING: Permanently delete ${cafeName} and its business data?`)) {
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("delete-cafe", {
+      method: "POST",
+      body: {
+        business_id: businessId,
+        confirm_name: typedName.trim()
+      }
+    });
+
+    if (error) throw error;
+    if (!data?.success) {
+      throw new Error(data?.message || "Cafe deletion failed.");
+    }
+
+    alert(data.message || "Cafe deleted.");
+    await loadCafes();
+
+  } catch (error) {
+    console.error("Cafe deletion error:", error);
+    alert("Delete cafe error: " + error.message);
+  }
+}
+
 async function loadCafes() {
   if (!authorized) return;
 
@@ -467,21 +506,32 @@ async function loadCafes() {
   }
 </div>
 
-        <div class="actions">
-          <button class="secondary" data-action="suspend">Suspend</button>
-          <button data-action="active">Reactivate</button>
-          <button class="secondary" data-action="permanently_disabled">
-            Permanently Disable
-          </button>
-        </div>
+       <div class="actions">
+  <button class="secondary" data-action="suspend">Suspend</button>
+  <button data-action="active">Reactivate</button>
+  <button class="secondary" data-action="permanently_disabled">
+    Permanently Disable
+  </button>
+  <button
+    data-action="delete"
+    style="background:#b91c1c;color:white"
+  >
+    Delete Cafe
+  </button>
+</div>
       `;
 
-      card.querySelectorAll("button").forEach(button => {
-        button.addEventListener("click", () =>
-          changeCafeLicense(cafe.id, button.dataset.action, cafe.license_status)
-        );
-      });
+     card.querySelectorAll(
+  '[data-action="suspend"], [data-action="active"], [data-action="permanently_disabled"]'
+).forEach(button => {
+  button.addEventListener("click", () =>
+    changeCafeLicense(cafe.id, button.dataset.action, cafe.license_status)
+  );
+});
 
+card.querySelector('[data-action="delete"]').addEventListener("click", () =>
+  deleteCafe(cafe.id, cafe.name || cafe.cafe_name || "Unnamed Cafe")
+);
       if (status === "permanently_disabled") {
         card.querySelector('[data-action="active"]').disabled = true;
         card.querySelector('[data-action="suspend"]').disabled = true;
