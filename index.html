@@ -152,7 +152,25 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
     <button class="secondary" onclick="loadTables()">↻ Refresh</button>
   </div>
 
- 
+<div class="card section">
+  <h2>Add New Table</h2>
+
+  <div class="formgrid">
+    <div class="field">
+      <label>Table Name / Number</label>
+      <input id="newTableName" placeholder="e.g. Table 1">
+    </div>
+
+    <div class="field">
+      <label>Seating Capacity</label>
+      <input id="newTableCapacity" type="number" min="1" value="2">
+    </div>
+  </div>
+
+  <div class="actions">
+    <button onclick="addCafeTable()">＋ Add Table</button>
+  </div>
+</div> 
   <div class="card section">
     <div class="sectionhead">
       <h2>All Tables</h2>
