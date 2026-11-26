@@ -17,7 +17,7 @@ main{padding:26px;max-width:1400px;width:100%;margin:auto}.welcome{display:flex;
 </style>
 </head>
 <body>
-<header><div class="brand">☕ <span>BaitHak</span> Cafe <small class="muted">MANAGEMENT</small></div><div class="topright"><span class="status">● Local mode</span><div class="rolebox"><select id="roleSelect" aria-label="Choose role" style="width:auto;padding:7px 9px"><option>Owner</option><option>Manager</option><option>Cashier</option><option>Waiter</option></select></div></div></header>
+<header>   <div class="brand">☕ <span>BaitHak</span> Cafe <small class="muted">MANAGEMENT</small></div>   <div class="topright">     <span class="status">● Local mode</span>     <div class="rolebox">       <select id="roleSelect" aria-label="Choose role" style="width:auto;padding:7px 9px">         <option>Owner</option>         <option>Manager</option>         <option>Cashier</option>         <option>Waiter</option>       </select>     </div>     <button class="danger" onclick="logoutOwner()">Logout</button>   </div> </header><select id="roleSelect" aria-label="Choose role" style="width:auto;padding:7px 9px"><option>Owner</option><option>Manager</option><option>Cashier</option><option>Waiter</option></select></div></div></header>
 <div class="layout">
 <aside>
 <div class="navlabel">WORKSPACE</div>
@@ -1586,7 +1586,19 @@ async function saveCloudData() {
     }
   }
 }
+async function logoutOwner() {
+  if (!confirm('Are you sure you want to logout?')) return;
 
+  const { error } = await supabaseClient.auth.signOut();
+
+  if (error) {
+    alert('Logout failed: ' + error.message);
+    return;
+  }
+
+  cloudReady = false;
+  location.reload();
+}
 function queueCloudSave() {
   if (!cloudReady) return;
 
